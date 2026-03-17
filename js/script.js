@@ -62,4 +62,19 @@ document.addEventListener('DOMContentLoaded', () => {
     revealElements.forEach(el => {
         revealObserver.observe(el);
     });
+
+    // 4. Google Ads Conversion Tracking para Botões do WhatsApp
+    const whatsappLinks = document.querySelectorAll('a[href*="wa.me"]');
+    whatsappLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (typeof gtag === 'function') {
+                // IMPORTANTE: Substitua AW-XXXXXXXXYY/ZZZZZZZZZZZZZZZZZZ
+                // pelo seu ID de Conversão / Rótulo de Conversão do Google Ads.
+                gtag('event', 'conversion', {
+                    'send_to': 'AW-XXXXXXXXYY/ZZZZZZZZZZZZZZZZZZ'
+                });
+                console.log('Evento de conversão do WhatsApp disparado.');
+            }
+        });
+    });
 });
