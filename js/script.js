@@ -68,9 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
     whatsappLinks.forEach(link => {
         link.addEventListener('click', () => {
             if (typeof gtag === 'function') {
-                // ID da conta: AW-16663688962 | Substitua CONVERSION_LABEL pelo rótulo da sua conversão
+                // ID da conta: AW-16663688962 | Rótulo de conversão WhatsApp
                 gtag('event', 'conversion', {
-                    'send_to': 'AW-16663688962/CONVERSION_LABEL'
+                    'send_to': 'AW-16663688962/0lmZCJaEmY4cEILu7ok-'
                 });
                 console.log('Evento de conversão do WhatsApp disparado.');
             }
