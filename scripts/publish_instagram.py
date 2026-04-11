@@ -1,29 +1,26 @@
 """
-publish_instagram.py — Publica um post no Instagram via Graph API.
+publish_instagram.py — Publica um post no Instagram via instagrapi.
 
 Fluxo:
   1. Lê o JSON mais recente em content/weekly-posts/
-  2. Gera (ou reutiliza) uma imagem a partir do image_prompt
-  3. Cria um container de mídia na Instagram Graph API
-  4. Publica o container no feed
+  2. Gera uma imagem a partir do image_prompt (via pollinations.ai)
+  3. Faz login no Instagram com username/password
+  4. Publica a foto com legenda no feed
 
-Tokens necessários (env vars ou GitHub Secrets):
-  - IG_USER_ID        — ID numérico da conta Instagram Business
-  - IG_ACCESS_TOKEN   — Token de longa duração do Facebook Graph API
+Secrets necessários (GitHub Secrets):
+  - IG_USERNAME   — Username do Instagram (ex: dra.brunasilvestrini)
+  - IG_PASSWORD   — Senha do Instagram
 """
 
 import json
 import os
 import sys
-import time
+import ssl
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
-import ssl
 from pathlib import Path
-
-
-GRAPH_API = "https://graph.facebook.com/v22.0"
 
 
 def ssl_context() -> ssl.SSLContext:
@@ -31,44 +28,6 @@ def ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context()
     except Exception:
         return ssl._create_unverified_context()
-
-
-def graph_post(endpoint: str, params: dict, token: str) -> dict:
-    """POST to Facebook Graph API and return parsed JSON."""
-    params["access_token"] = token
-    data = urllib.parse.urlencode(params).encode("utf-8")
-    url = f"{GRAPH_API}/{endpoint}"
-    req = urllib.request.Request(url, data=data, method="POST")
-    ctx = ssl_context()
-    try:
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as res:
-            return json.loads(res.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode("utf-8")
-        except Exception:
-            pass
-        raise RuntimeError(f"Graph API HTTP {e.code}: {body or e.reason}")
-
-
-def graph_get(endpoint: str, params: dict, token: str) -> dict:
-    """GET from Facebook Graph API and return parsed JSON."""
-    params["access_token"] = token
-    qs = urllib.parse.urlencode(params)
-    url = f"{GRAPH_API}/{endpoint}?{qs}"
-    req = urllib.request.Request(url)
-    ctx = ssl_context()
-    try:
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as res:
-            return json.loads(res.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode("utf-8")
-        except Exception:
-            pass
-        raise RuntimeError(f"Graph API HTTP {e.code}: {body or e.reason}")
 
 
 def find_latest_post_json(posts_dir: str = "content/weekly-posts") -> Path:
@@ -80,84 +39,48 @@ def find_latest_post_json(posts_dir: str = "content/weekly-posts") -> Path:
     return json_files[0]
 
 
+def download_image(url: str, dest: Path) -> Path:
+    """Download an image from a URL to a local file."""
+    ctx = ssl_context()
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "instagram-poster/1.0",
+            "Accept": "image/*",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=120, context=ctx) as res:
+        data = res.read()
+    dest.write_bytes(data)
+    return dest
+
+
 def build_image_url(prompt: str) -> str:
-    """
-    Builds a publicly-accessible image URL from the prompt.
-    Uses a placeholder service. In production, replace with your
-    preferred image generation API (DALL-E, Midjourney, etc.)
-    that returns a public URL.
-    """
-    # The Instagram API requires a publicly accessible image URL.
-    # Option 1: Use the image_prompt to generate via an external API
-    # Option 2: If the workflow already generated and uploaded an image,
-    #           read the URL from the JSON.
-    #
-    # For now, we support both: if 'image_url' exists in the JSON, use it.
-    # Otherwise, generate from the prompt via a configurable service.
+    """Build a public image URL from the prompt using pollinations.ai."""
     encoded = urllib.parse.quote(prompt, safe="")
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true"
 
 
-def create_media_container(ig_user_id: str, token: str, image_url: str, caption: str) -> str:
-    """Create an Instagram media container (step 1 of publishing)."""
-    result = graph_post(
-        f"{ig_user_id}/media",
-        {
-            "image_url": image_url,
-            "caption": caption,
-        },
-        token,
-    )
-    container_id = result.get("id")
-    if not container_id:
-        raise RuntimeError(f"Falha ao criar container: {result}")
-    return container_id
-
-
-def wait_for_container(ig_user_id: str, token: str, container_id: str, max_wait: int = 120) -> None:
-    """Poll the container status until it's FINISHED or ERROR."""
-    for _ in range(max_wait // 5):
-        status = graph_get(
-            container_id,
-            {"fields": "status_code"},
-            token,
-        )
-        code = status.get("status_code", "")
-        if code == "FINISHED":
-            return
-        if code == "ERROR":
-            raise RuntimeError(f"Container em erro: {status}")
-        print(f"  Container status: {code} — aguardando...")
-        time.sleep(5)
-    raise RuntimeError(f"Timeout esperando container {container_id}")
-
-
-def publish_container(ig_user_id: str, token: str, container_id: str) -> str:
-    """Publish the container (step 2 — the post goes live)."""
-    result = graph_post(
-        f"{ig_user_id}/media_publish",
-        {"creation_id": container_id},
-        token,
-    )
-    media_id = result.get("id")
-    if not media_id:
-        raise RuntimeError(f"Falha ao publicar: {result}")
-    return media_id
-
-
 def main() -> int:
-    ig_user_id = os.environ.get("IG_USER_ID", "").strip()
-    ig_token = os.environ.get("IG_ACCESS_TOKEN", "").strip()
+    ig_username = os.environ.get("IG_USERNAME", "").strip()
+    ig_password = os.environ.get("IG_PASSWORD", "").strip()
 
-    if not ig_user_id or not ig_token:
+    if not ig_username or not ig_password:
         print(
-            "❌ Variáveis IG_USER_ID e IG_ACCESS_TOKEN são obrigatórias.\n"
+            "❌ Variáveis IG_USERNAME e IG_PASSWORD são obrigatórias.\n"
             "Configure em GitHub > Settings > Secrets and variables > Actions.",
             file=sys.stderr,
         )
         return 1
 
-    # Pegar o JSON do post mais recente
+    # Importar instagrapi aqui para falhar cedo se não instalado
+    try:
+        from instagrapi import Client
+    except ImportError:
+        print("❌ Biblioteca 'instagrapi' não encontrada. Instale com: pip install instagrapi", file=sys.stderr)
+        return 1
+
+    # Localizar o JSON do post
     post_path = os.environ.get("POST_JSON_PATH", "")
     if post_path:
         post_file = Path(post_path)
@@ -170,10 +93,9 @@ def main() -> int:
     caption = post_data.get("caption", "")
     hashtags = post_data.get("hashtags", [])
     image_prompt = post_data.get("image_prompt", "")
+    image_url = post_data.get("image_url", "")
     disclaimer = post_data.get("disclaimer", "")
 
-    # Verificar se já existe uma image_url explícita no JSON
-    image_url = post_data.get("image_url", "")
     if not image_url:
         if not image_prompt:
             print("❌ Sem image_url nem image_prompt no JSON.", file=sys.stderr)
@@ -191,25 +113,72 @@ def main() -> int:
     if disclaimer:
         full_caption += "\n\n⚠️ " + disclaimer.strip()
 
-    print(f"📸 Imagem URL: {image_url[:120]}...")
-    print(f"📝 Legenda ({len(full_caption)} chars):\n{full_caption[:300]}...")
+    print(f"📸 Imagem URL: {image_url[:100]}...")
+    print(f"📝 Legenda ({len(full_caption)} chars)")
 
-    # Etapa 1: Criar container
-    print("\n⏳ Criando container de mídia no Instagram...")
-    container_id = create_media_container(ig_user_id, ig_token, image_url, full_caption)
-    print(f"✅ Container criado: {container_id}")
+    # Baixar a imagem
+    with tempfile.TemporaryDirectory() as tmpdir:
+        img_path = Path(tmpdir) / "post_image.jpg"
+        print("⬇️  Baixando imagem...")
+        try:
+            download_image(image_url, img_path)
+        except Exception as e:
+            print(f"❌ Falha ao baixar imagem: {e}", file=sys.stderr)
+            return 1
+        print(f"✅ Imagem salva ({img_path.stat().st_size / 1024:.1f} KB)")
 
-    # Etapa 2: Aguardar processamento
-    print("⏳ Aguardando processamento da imagem...")
-    wait_for_container(ig_user_id, ig_token, container_id)
-    print("✅ Container pronto!")
+        # Login no Instagram
+        print(f"\n🔐 Fazendo login como @{ig_username}...")
+        cl = Client()
 
-    # Etapa 3: Publicar
-    print("⏳ Publicando no feed...")
-    media_id = publish_container(ig_user_id, ig_token, container_id)
-    print(f"\n🎉 Post publicado com sucesso!")
-    print(f"   Media ID: {media_id}")
-    print(f"   Perfil: https://www.instagram.com/dra.brunasilvestrini/")
+        # Configurar delays para parecer humano e evitar bloqueios
+        cl.delay_range = [3, 7]
+
+        # Tentar carregar sessão salva (evita login repetido)
+        session_file = Path("ig_session.json")
+        try:
+            if session_file.exists():
+                cl.load_settings(session_file)
+                cl.login(ig_username, ig_password)
+                print("✅ Sessão restaurada!")
+            else:
+                cl.login(ig_username, ig_password)
+                print("✅ Login realizado!")
+            cl.dump_settings(session_file)
+        except Exception as e:
+            print(f"⚠️  Erro no login com sessão, tentando login limpo: {e}")
+            try:
+                cl = Client()
+                cl.delay_range = [3, 7]
+                cl.login(ig_username, ig_password)
+                cl.dump_settings(session_file)
+                print("✅ Login realizado (sem sessão prévia)!")
+            except Exception as login_err:
+                print(f"❌ Falha no login do Instagram: {login_err}", file=sys.stderr)
+                print(
+                    "\nPossíveis causas:\n"
+                    "  - Senha incorreta\n"
+                    "  - Autenticação de dois fatores (2FA) ativada\n"
+                    "  - Instagram bloqueou login de localização desconhecida\n"
+                    "  - Muitas tentativas de login recentes",
+                    file=sys.stderr,
+                )
+                return 1
+
+        # Publicar no feed
+        print("\n📤 Publicando no feed do Instagram...")
+        try:
+            media = cl.photo_upload(
+                path=img_path,
+                caption=full_caption,
+            )
+            print(f"\n🎉 Post publicado com sucesso!")
+            print(f"   Media ID: {media.pk}")
+            print(f"   URL: https://www.instagram.com/p/{media.code}/")
+            print(f"   Perfil: https://www.instagram.com/{ig_username}/")
+        except Exception as e:
+            print(f"❌ Falha ao publicar: {e}", file=sys.stderr)
+            return 1
 
     return 0
 
