@@ -41,7 +41,9 @@ jobs:
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
+        continue-on-error: true
         with:
+          token: ${{ secrets.GH_PAT != '' && secrets.GH_PAT || github.token }}
           commit-message: "chore: gerar rascunho de post semanal"
           title: "Rascunho: post semanal (harmonização)"
           body: "Gerado automaticamente pelo workflow semanal."
@@ -49,3 +51,8 @@ jobs:
           add-paths: |
             content/weekly-posts/*.md
             content/weekly-posts/*.json
+
+      - name: Manual PR link (if needed)
+        run: |
+          echo "Se a criação automática de PR falhar por permissão, abra manualmente:"
+          echo "https://github.com/${{ github.repository }}/pull/new/automation/weekly-post"
