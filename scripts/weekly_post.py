@@ -129,7 +129,7 @@ def openai_chat_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLCo
         "messages": [
             {
                 "role": "system",
-                "content": "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer.",
+                "content": "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. OBRIGATÓRIO: a legenda (caption) DEVE terminar com uma chamada para ação direcionando ao WhatsApp, usando o formato: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer.",
             },
             {"role": "user", "content": json.dumps(seed, ensure_ascii=False)},
         ],
@@ -185,7 +185,7 @@ def anthropic_messages_json(api_key: str, model: str, seed: dict, *, context: ss
         "model": model,
         "max_tokens": 900,
         "temperature": 0.7,
-        "system": "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer.",
+        "system": "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. OBRIGATÓRIO: a legenda (caption) DEVE terminar com uma chamada para ação direcionando ao WhatsApp, usando o formato: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer.",
         "messages": [{"role": "user", "content": json.dumps(seed, ensure_ascii=False)}],
     }
     data = json.dumps(payload).encode("utf-8")
@@ -233,7 +233,7 @@ def anthropic_messages_json(api_key: str, model: str, seed: dict, *, context: ss
 
 def gemini_generate_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLContext) -> dict:
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model)}:generateContent?key={urllib.parse.quote(api_key)}"
-    system = "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer."
+    system = "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. OBRIGATÓRIO: a legenda (caption) DEVE terminar com uma chamada para ação direcionando ao WhatsApp, usando o formato: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer."
     payload = {
         "contents": [
             {
@@ -491,7 +491,8 @@ def main() -> int:
                 f"Tema da semana: {item['title']}\n\n"
                 "Na harmonização facial, pequenas estratégias podem valorizar traços com naturalidade. "
                 "Se quiser entender o que faz sentido para o seu caso, a avaliação individual é o primeiro passo.\n\n"
-                "Agende pelo WhatsApp." 
+                "📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\n"
+                "Ou clique no link da bio!"
             ),
             "hashtags": [
                 "harmonizacaofacial",
