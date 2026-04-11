@@ -28,14 +28,16 @@ jobs:
       - name: Generate post
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "Missing secret OPENAI_API_KEY. Configure em Settings -> Secrets and variables -> Actions." >&2
+          if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ]; then
+            echo "Missing secrets. Configure pelo menos 1: OPENAI_API_KEY, ANTHROPIC_API_KEY ou GOOGLE_API_KEY em Settings -> Secrets and variables -> Actions." >&2
             exit 1
           fi
           QUERY="${{ github.event.inputs.query }}"
           if [ -z "$QUERY" ]; then QUERY="harmonização facial benefícios"; fi
-          python -u scripts/weekly_post.py --require-openai --fallback-on-openai-error --query "$QUERY"
+          python -u scripts/weekly_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini" --query "$QUERY"
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6

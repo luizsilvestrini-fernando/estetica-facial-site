@@ -179,6 +179,113 @@ def openai_chat_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLCo
         raise RuntimeError(f"Modelo não retornou JSON válido. Conteúdo: {snippet}")
 
 
+def anthropic_messages_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLContext) -> dict:
+    url = "https://api.anthropic.com/v1/messages"
+    payload = {
+        "model": model,
+        "max_tokens": 900,
+        "temperature": 0.7,
+        "system": "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer.",
+        "messages": [{"role": "user", "content": json.dumps(seed, ensure_ascii=False)}],
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60, context=context) as res:
+            body = res.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8")
+        except Exception:
+            err_body = ""
+        raise RuntimeError(f"Anthropic HTTP {e.code}: {err_body or e.reason}")
+
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        snippet = body[:800]
+        raise RuntimeError(f"Anthropic retornou resposta inválida (não-JSON): {snippet}")
+
+    parts = parsed.get("content") or []
+    text = "".join([p.get("text", "") for p in parts if isinstance(p, dict)])
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n", "", text)
+        text = re.sub(r"\n```$", "", text)
+        text = text.strip()
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        snippet = text[:1200]
+        raise RuntimeError(f"Modelo não retornou JSON válido. Conteúdo: {snippet}")
+
+
+def gemini_generate_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLContext) -> dict:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model)}:generateContent?key={urllib.parse.quote(api_key)}"
+    system = "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer."
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {"text": system + "\n\n" + json.dumps(seed, ensure_ascii=False)}
+                ],
+            }
+        ],
+        "generationConfig": {"temperature": 0.7},
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60, context=context) as res:
+            body = res.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8")
+        except Exception:
+            err_body = ""
+        raise RuntimeError(f"Gemini HTTP {e.code}: {err_body or e.reason}")
+
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        snippet = body[:800]
+        raise RuntimeError(f"Gemini retornou resposta inválida (não-JSON): {snippet}")
+
+    candidates = parsed.get("candidates") or []
+    content = ((candidates[0] or {}).get("content") or {}) if candidates else {}
+    parts = content.get("parts") or []
+    text = "".join([p.get("text", "") for p in parts if isinstance(p, dict)]).strip()
+
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*\n", "", text)
+        text = re.sub(r"\n```$", "", text)
+        text = text.strip()
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        snippet = text[:1200]
+        raise RuntimeError(f"Modelo não retornou JSON válido. Conteúdo: {snippet}")
+
+
 def ensure_fields(obj: dict) -> dict:
     required = [
         "source_title",
@@ -267,6 +374,16 @@ def main() -> int:
         help="Modelo OpenAI (padrão via OPENAI_MODEL)",
     )
     parser.add_argument(
+        "--anthropic-model",
+        default=os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"),
+        help="Modelo Anthropic (padrão via ANTHROPIC_MODEL)",
+    )
+    parser.add_argument(
+        "--gemini-model",
+        default=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
+        help="Modelo Gemini (padrão via GEMINI_MODEL)",
+    )
+    parser.add_argument(
         "--insecure-ssl",
         action="store_true",
         help="Desabilita verificação SSL (use só para debug local)",
@@ -282,15 +399,37 @@ def main() -> int:
         help="Falha se OPENAI_API_KEY não estiver configurada",
     )
     parser.add_argument(
+        "--ai-provider-order",
+        default="openai,anthropic,gemini",
+        help="Ordem de provedores: openai,anthropic,gemini",
+    )
+    parser.add_argument(
+        "--require-any-ai",
+        action="store_true",
+        help="Falha se nenhum provedor de IA estiver configurado",
+    )
+    parser.add_argument(
+        "--fallback-to-draft-on-all-fail",
+        action="store_true",
+        help="Se todos provedores falharem, gera rascunho sem IA em vez de falhar",
+    )
+    parser.add_argument(
         "--fallback-on-openai-error",
         action="store_true",
         help="Em erro da OpenAI (ex.: quota), gera rascunho sem IA em vez de falhar",
     )
     args = parser.parse_args()
 
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if args.require_openai and not api_key:
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    gemini_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+
+    if args.require_openai and not openai_key:
         print("OPENAI_API_KEY não configurada", file=sys.stderr)
+        return 2
+
+    if args.require_any_ai and not (openai_key or anthropic_key or gemini_key):
+        print("Nenhum provedor de IA configurado (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY)", file=sys.stderr)
         return 2
 
     q = args.query.strip() or "harmonização facial benefícios"
@@ -378,19 +517,60 @@ def main() -> int:
             "disclaimer": disclaimer,
         }
 
-    if args.dry_run or not api_key:
+    if args.dry_run:
         result = draft_result()
     else:
-        try:
-            result = openai_chat_json(api_key=api_key, model=args.model, seed=seed, context=context)
-            result = ensure_fields(result)
-        except RuntimeError as e:
-            msg = str(e)
-            is_quota = "insufficient_quota" in msg or "HTTP 429" in msg
-            if args.fallback_on_openai_error and is_quota:
-                result = draft_result("Rascunho gerado sem IA por limitação de quota da API.")
+        provider_order = [p.strip().lower() for p in args.ai_provider_order.split(",") if p.strip()]
+
+        last_error: str | None = None
+        result = None
+
+        for provider in provider_order:
+            if provider == "openai":
+                if not openai_key:
+                    continue
+                try:
+                    result = openai_chat_json(api_key=openai_key, model=args.model, seed=seed, context=context)
+                    result = ensure_fields(result)
+                    break
+                except RuntimeError as e:
+                    msg = str(e)
+                    last_error = msg
+                    is_quota = "insufficient_quota" in msg or "HTTP 429" in msg
+                    if not (args.fallback_on_openai_error and is_quota):
+                        continue
+                    continue
+
+            if provider == "anthropic":
+                if not anthropic_key:
+                    continue
+                try:
+                    result = anthropic_messages_json(api_key=anthropic_key, model=args.anthropic_model, seed=seed, context=context)
+                    result = ensure_fields(result)
+                    break
+                except RuntimeError as e:
+                    last_error = str(e)
+                    continue
+
+            if provider == "gemini":
+                if not gemini_key:
+                    continue
+                try:
+                    result = gemini_generate_json(api_key=gemini_key, model=args.gemini_model, seed=seed, context=context)
+                    result = ensure_fields(result)
+                    break
+                except RuntimeError as e:
+                    last_error = str(e)
+                    continue
+
+        if result is None:
+            if args.fallback_to_draft_on_all_fail:
+                extra = "Rascunho gerado sem IA: nenhum provedor respondeu com sucesso."
+                if last_error:
+                    extra = extra + " Erro: " + last_error[:180]
+                result = draft_result(extra)
             else:
-                raise
+                raise RuntimeError(last_error or "Nenhum provedor de IA respondeu")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
