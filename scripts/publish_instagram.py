@@ -1,78 +1,25 @@
 """
-publish_instagram.py — Publica um post no Instagram via Graph API.
-
-Fluxo:
-  1. Lê o JSON mais recente em content/weekly-posts/
-  2. Gera (ou reutiliza) uma imagem a partir do image_prompt
-  3. Cria um container de mídia na Instagram Graph API
-  4. Publica o container no feed
-
-Tokens necessários (env vars ou GitHub Secrets):
-  - IG_USER_ID        — ID numérico da conta Instagram Business
-  - IG_ACCESS_TOKEN   — Token de longa duração do Facebook Graph API
+publish_instagram.py — Publica post ou vídeo no Instagram via instagrapi.
 """
 
 import json
 import os
 import sys
+import ssl
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import ssl
 from pathlib import Path
 
 
-GRAPH_API = "https://graph.facebook.com/v22.0"
-
-
 def ssl_context() -> ssl.SSLContext:
-    try:
-        return ssl.create_default_context()
-    except Exception:
-        return ssl._create_unverified_context()
+    ctx = ssl._create_unverified_context()
+    return ctx
 
 
-def graph_post(endpoint: str, params: dict, token: str) -> dict:
-    """POST to Facebook Graph API and return parsed JSON."""
-    params["access_token"] = token
-    data = urllib.parse.urlencode(params).encode("utf-8")
-    url = f"{GRAPH_API}/{endpoint}"
-    req = urllib.request.Request(url, data=data, method="POST")
-    ctx = ssl_context()
-    try:
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as res:
-            return json.loads(res.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode("utf-8")
-        except Exception:
-            pass
-        raise RuntimeError(f"Graph API HTTP {e.code}: {body or e.reason}")
-
-
-def graph_get(endpoint: str, params: dict, token: str) -> dict:
-    """GET from Facebook Graph API and return parsed JSON."""
-    params["access_token"] = token
-    qs = urllib.parse.urlencode(params)
-    url = f"{GRAPH_API}/{endpoint}?{qs}"
-    req = urllib.request.Request(url)
-    ctx = ssl_context()
-    try:
-        with urllib.request.urlopen(req, timeout=60, context=ctx) as res:
-            return json.loads(res.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = ""
-        try:
-            body = e.read().decode("utf-8")
-        except Exception:
-            pass
-        raise RuntimeError(f"Graph API HTTP {e.code}: {body or e.reason}")
-
-
-def find_latest_post_json(posts_dir: str = "content/weekly-posts") -> Path:
-    """Find the most recent .json post file."""
+def find_latest_post_json(posts_dir: str = "content/daily-posts") -> Path:
     d = Path(posts_dir)
     json_files = sorted(d.glob("*.json"), reverse=True)
     if not json_files:
@@ -80,84 +27,118 @@ def find_latest_post_json(posts_dir: str = "content/weekly-posts") -> Path:
     return json_files[0]
 
 
+def download_image(url: str, dest: Path) -> Path:
+    ctx = ssl_context()
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "instagram-poster/1.0", "Accept": "image/*"},
+    )
+    with urllib.request.urlopen(req, timeout=120, context=ctx) as res:
+        data = res.read()
+    dest.write_bytes(data)
+    return dest
+
+
 def build_image_url(prompt: str) -> str:
-    """
-    Builds a publicly-accessible image URL from the prompt.
-    Uses a placeholder service. In production, replace with your
-    preferred image generation API (DALL-E, Midjourney, etc.)
-    that returns a public URL.
-    """
-    # The Instagram API requires a publicly accessible image URL.
-    # Option 1: Use the image_prompt to generate via an external API
-    # Option 2: If the workflow already generated and uploaded an image,
-    #           read the URL from the JSON.
-    #
-    # For now, we support both: if 'image_url' exists in the JSON, use it.
-    # Otherwise, generate from the prompt via a configurable service.
     encoded = urllib.parse.quote(prompt, safe="")
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true"
 
 
-def create_media_container(ig_user_id: str, token: str, image_url: str, caption: str) -> str:
-    """Create an Instagram media container (step 1 of publishing)."""
-    result = graph_post(
-        f"{ig_user_id}/media",
-        {
-            "image_url": image_url,
-            "caption": caption,
-        },
-        token,
-    )
-    container_id = result.get("id")
-    if not container_id:
-        raise RuntimeError(f"Falha ao criar container: {result}")
-    return container_id
+def generate_endcard_image(out_path: str):
+    """Gera o letreiro final usando PIL sem depender de ImageMagick."""
+    from PIL import Image, ImageDraw, ImageFont
+    # Fundo rosa claro
+    img = Image.new("RGB", (1080, 1080), color=(255, 246, 248))
+    draw = ImageDraw.Draw(img)
+
+    # Tenta carregar a logo do repositório
+    logo_path = Path("assets/logo_bs_pink_1770921996696.png")
+    if logo_path.exists():
+        try:
+            logo = Image.open(logo_path).convert("RGBA")
+            # Redimensiona logo
+            logo.thumbnail((500, 500))
+            x_pos = (1080 - logo.width) // 2
+            y_pos = 300
+            img.paste(logo, (x_pos, y_pos), mask=logo)
+        except Exception as e:
+            print(f"Aviso: Falha ao carregar logo: {e}")
+
+    # Fonte fallback
+    try:
+        font = ImageFont.truetype("arial.ttf", 46)
+        font_large = ImageFont.truetype("arial.ttf", 60)
+    except IOError:
+        font = ImageFont.load_default()
+        font_large = font
+
+    text = "Agende sua avaliação GRATUITA pelo WhatsApp!"
+    number = "(11) 99550-5765"
+
+    try:
+        bb1 = draw.textbbox((0, 0), text, font=font)
+        w1 = bb1[2] - bb1[0]
+        bb2 = draw.textbbox((0, 0), number, font=font_large)
+        w2 = bb2[2] - bb2[0]
+    except AttributeError:
+        # Fallback para Pillow antigas
+        w1, _ = draw.textsize(text, font=font)
+        w2, _ = draw.textsize(number, font=font_large)
+
+    draw.text(((1080 - w1) // 2, 800), text, fill=(50, 50, 50), font=font)
+    draw.text(((1080 - w2) // 2, 860), number, fill=(210, 50, 100), font=font_large)
+
+    img.save(out_path)
 
 
-def wait_for_container(ig_user_id: str, token: str, container_id: str, max_wait: int = 120) -> None:
-    """Poll the container status until it's FINISHED or ERROR."""
-    for _ in range(max_wait // 5):
-        status = graph_get(
-            container_id,
-            {"fields": "status_code"},
-            token,
-        )
-        code = status.get("status_code", "")
-        if code == "FINISHED":
-            return
-        if code == "ERROR":
-            raise RuntimeError(f"Container em erro: {status}")
-        print(f"  Container status: {code} — aguardando...")
-        time.sleep(5)
-    raise RuntimeError(f"Timeout esperando container {container_id}")
+def make_video(image_path: str, transcript: str, out_path: str):
+    """Cria o clipe mp4 juntando TTS, imagem e letreiro no final."""
+    print("🎬 Iniciando processamento de VÍDEO...")
+    try:
+        from gtts import gTTS
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    except ImportError:
+        raise RuntimeError("Dependências 'gTTS' ou 'moviepy' não instaladas. Rode pip install gTTS moviepy.")
 
+    tmp_dir = Path(image_path).parent
 
-def publish_container(ig_user_id: str, token: str, container_id: str) -> str:
-    """Publish the container (step 2 — the post goes live)."""
-    result = graph_post(
-        f"{ig_user_id}/media_publish",
-        {"creation_id": container_id},
-        token,
-    )
-    media_id = result.get("id")
-    if not media_id:
-        raise RuntimeError(f"Falha ao publicar: {result}")
-    return media_id
+    # 1. Gerar TTS
+    audio_path = str(tmp_dir / "tts_audio.mp3")
+    print(f"🎵 Gerando áudio TTS com texto: '{transcript[:50]}...'")
+    tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
+    tts.save(audio_path)
+
+    # 2. Clips principais
+    audio_clip = AudioFileClip(audio_path)
+    main_img_clip = ImageClip(image_path).set_duration(audio_clip.duration)
+    main_img_clip = main_img_clip.set_audio(audio_clip)
+
+    # 3. Clip do letreiro final (Endcard)
+    endcard_path = str(tmp_dir / "endcard.jpg")
+    generate_endcard_image(endcard_path)
+    endcard_clip = ImageClip(endcard_path).set_duration(3.5) # Tela final com logo fica 3,5 seg
+
+    # 4. Concatenar e renderizar
+    final_clip = concatenate_videoclips([main_img_clip, endcard_clip], method="compose")
+    print("⏳ Renderizando arquivo MP4...")
+    final_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac")
+    print(f"✅ Vídeo gerado em {out_path}")
 
 
 def main() -> int:
-    ig_user_id = os.environ.get("IG_USER_ID", "").strip()
-    ig_token = os.environ.get("IG_ACCESS_TOKEN", "").strip()
+    ig_username = os.environ.get("IG_USERNAME", "").strip()
+    ig_password = os.environ.get("IG_PASSWORD", "").strip()
 
-    if not ig_user_id or not ig_token:
-        print(
-            "❌ Variáveis IG_USER_ID e IG_ACCESS_TOKEN são obrigatórias.\n"
-            "Configure em GitHub > Settings > Secrets and variables > Actions.",
-            file=sys.stderr,
-        )
+    if not ig_username or not ig_password:
+        print("❌ Variáveis IG_USERNAME e IG_PASSWORD são obrigatórias.", file=sys.stderr)
         return 1
 
-    # Pegar o JSON do post mais recente
+    try:
+        from instagrapi import Client
+    except ImportError:
+        print("❌ Biblioteca 'instagrapi' não encontrada.", file=sys.stderr)
+        return 1
+
     post_path = os.environ.get("POST_JSON_PATH", "")
     if post_path:
         post_file = Path(post_path)
@@ -170,49 +151,103 @@ def main() -> int:
     caption = post_data.get("caption", "")
     hashtags = post_data.get("hashtags", [])
     image_prompt = post_data.get("image_prompt", "")
-    disclaimer = post_data.get("disclaimer", "")
-
-    # Verificar se já existe uma image_url explícita no JSON
     image_url = post_data.get("image_url", "")
+    disclaimer = post_data.get("disclaimer", "")
+    is_video = post_data.get("is_video", False)
+    video_script = post_data.get("video_script", "")
+
     if not image_url:
-        if not image_prompt:
-            print("❌ Sem image_url nem image_prompt no JSON.", file=sys.stderr)
-            return 1
-        print("🎨 Gerando imagem a partir do prompt...")
+        print("🎨 Gerando imagem de fundo a partir do prompt...")
         image_url = build_image_url(image_prompt)
 
-    # Montar legenda final
-    hashtag_str = " ".join(
-        [h if h.startswith("#") else f"#{h}" for h in hashtags]
-    )
+    hashtag_str = " ".join([h if h.startswith("#") else f"#{h}" for h in hashtags])
     full_caption = caption.strip()
     if hashtag_str:
         full_caption += "\n\n" + hashtag_str.strip()
     if disclaimer:
         full_caption += "\n\n⚠️ " + disclaimer.strip()
 
-    print(f"📸 Imagem URL: {image_url[:120]}...")
-    print(f"📝 Legenda ({len(full_caption)} chars):\n{full_caption[:300]}...")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        img_path = Path(tmpdir) / "post_image.jpg"
+        print("⬇️ Baixando imagem...")
+        try:
+            download_image(image_url, img_path)
+        except Exception as e:
+            print(f"❌ Falha ao baixar imagem: {e}", file=sys.stderr)
+            return 1
+            
+        media_path = img_path
+        
+        if is_video and video_script.strip():
+            vid_path = str(Path(tmpdir) / "post_video.mp4")
+            try:
+                make_video(str(img_path), video_script, vid_path)
+                media_path = Path(vid_path)
+            except Exception as e:
+                print(f"❌ Falha ao montar vídeo: {e}", file=sys.stderr)
+                return 1
 
-    # Etapa 1: Criar container
-    print("\n⏳ Criando container de mídia no Instagram...")
-    container_id = create_media_container(ig_user_id, ig_token, image_url, full_caption)
-    print(f"✅ Container criado: {container_id}")
+        print(f"\n🔐 Fazendo login como @{ig_username}...")
+        cl = Client()
+        cl.delay_range = [3, 7]
+        session_file = Path("ig_session.json")
+        try:
+            if session_file.exists():
+                cl.load_settings(session_file)
+                cl.login(ig_username, ig_password)
+                print("✅ Sessão restaurada!")
+            else:
+                cl.login(ig_username, ig_password)
+                print("✅ Login realizado!")
+            cl.dump_settings(session_file)
+        except Exception as e:
+            try:
+                cl = Client()
+                cl.delay_range = [3, 7]
+                cl.login(ig_username, ig_password)
+                cl.dump_settings(session_file)
+            except Exception as login_err:
+                print(f"❌ Falha no login do Instagram: {login_err}", file=sys.stderr)
+                return 1
 
-    # Etapa 2: Aguardar processamento
-    print("⏳ Aguardando processamento da imagem...")
-    wait_for_container(ig_user_id, ig_token, container_id)
-    print("✅ Container pronto!")
+        print("\n📤 Publicando no feed do Instagram...")
+        try:
+            if is_video:
+                media = cl.video_upload(path=media_path, caption=full_caption)
+            else:
+                media = cl.photo_upload(path=media_path, caption=full_caption)
+                
+            print(f"\n🎉 Post publicado com sucesso!")
+            print(f"   Media ID: {media.pk}")
+            ig_url = f"https://www.instagram.com/p/{media.code}/"
+            print(f"   URL: {ig_url}")
+            
+            # Repassar URL pro GitHub Actions
+            if "GITHUB_OUTPUT" in os.environ:
+                with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                    f.write(f"ig_url={ig_url}\n")
+                    
+        except Exception as e:
+            print(f"❌ Falha ao publicar: {e}", file=sys.stderr)
+            return 1
 
-    # Etapa 3: Publicar
-    print("⏳ Publicando no feed...")
-    media_id = publish_container(ig_user_id, ig_token, container_id)
-    print(f"\n🎉 Post publicado com sucesso!")
-    print(f"   Media ID: {media_id}")
-    print(f"   Perfil: https://www.instagram.com/dra.brunasilvestrini/")
+        print("\n💬 Adicionando comentário com link do WhatsApp...")
+        time.sleep(5)
+        whatsapp_comment = (
+            "✨ Quer saber mais ou fazer uma avaliação?\n"
+            "📲 Agende conosco pelo WhatsApp clicando aqui:\n"
+            "👉 https://wa.me/5511995505765\n"
+        )
+        try:
+            comment = cl.media_comment(media.pk, whatsapp_comment)
+            try:
+                cl.comment_pin(media.pk, comment.pk)
+            except Exception:
+                pass
+        except Exception as comment_err:
+            print(f"⚠️ Comentário não adicionado: {comment_err}")
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

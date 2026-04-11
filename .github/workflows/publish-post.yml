@@ -1,12 +1,12 @@
 name: Publish Instagram Post
 
-# Dispara quando um PR da automação semanal é mergeado na main
+# Dispara quando um PR da automação diária é mergeado na main
 on:
   pull_request:
     types: [closed]
     branches: [main]
     paths:
-      - 'content/weekly-posts/*.json'
+      - 'content/daily-posts/*.json'
 
 jobs:
   publish:
@@ -17,18 +17,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main  # Garante que pega o código mergeado
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      - name: Install system dependencies (For Video Generation)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install python dependencies
+        run: pip install -r requirements.txt
+
       - name: Find latest post JSON
         id: find-post
         run: |
-          LATEST=$(ls -1 content/weekly-posts/*.json 2>/dev/null | sort -r | head -1)
+          LATEST=$(ls -1 content/daily-posts/*.json 2>/dev/null | sort -r | head -1)
           if [ -z "$LATEST" ]; then
-            echo "No JSON files found in content/weekly-posts/"
+            echo "No JSON files found in content/daily-posts/"
             exit 1
           fi
           echo "post_path=$LATEST" >> "$GITHUB_OUTPUT"
@@ -36,18 +42,30 @@ jobs:
           cat "$LATEST"
 
       - name: Publish to Instagram
+        id: pub
         env:
-          IG_USER_ID: ${{ secrets.IG_USER_ID }}
-          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USERNAME: ${{ secrets.IG_USERNAME }}
+          IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
           POST_JSON_PATH: ${{ steps.find-post.outputs.post_path }}
         run: |
-          if [ -z "$IG_USER_ID" ] || [ -z "$IG_ACCESS_TOKEN" ]; then
-            echo "⚠️  IG_USER_ID ou IG_ACCESS_TOKEN não configurados."
+          if [ -z "$IG_USERNAME" ] || [ -z "$IG_PASSWORD" ]; then
+            echo "⚠️  IG_USERNAME ou IG_PASSWORD não configurados."
             echo "Configure em Settings > Secrets and variables > Actions."
             echo "Pulando publicação."
             exit 0
           fi
           python -u scripts/publish_instagram.py
+
+      - name: Send WhatsApp Notification (Success)
+        if: success() && steps.pub.outputs.ig_url != ''
+        env:
+          WHATSAPP_API_KEY: ${{ secrets.WHATSAPP_API_KEY }}
+          LIVE_URL: ${{ steps.pub.outputs.ig_url }}
+        run: |
+          if [ -n "$WHATSAPP_API_KEY" ]; then
+            MSG="🎉 Post diário publicado com sucesso! Confira:%0A${LIVE_URL}"
+            curl -X GET "https://api.callmebot.com/whatsapp.php?phone=5511995505765&text=${MSG}&apikey=${WHATSAPP_API_KEY}"
+          fi
 
       - name: Notify on failure
         if: failure()
@@ -55,6 +73,7 @@ jobs:
           echo "❌ Falha na publicação do Instagram."
           echo "Verifique os logs acima para detalhes."
           echo "Possíveis causas:"
-          echo "  - Token expirado (regenere em Meta for Developers)"
-          echo "  - Imagem inacessível"
-          echo "  - Limites da API atingidos"
+          echo "  - Credenciais incorretas"
+          echo "  - 2FA ativado no Instagram (desative temporariamente)"
+          echo "  - Instagram bloqueou login de IP desconhecido"
+          echo "  - Faltando arquivos do MoviePy ou OpenAI Key para domingos"

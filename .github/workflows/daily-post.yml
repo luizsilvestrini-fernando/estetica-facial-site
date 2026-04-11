@@ -1,14 +1,13 @@
-name: Weekly Post Draft
+name: Daily Post Draft
 
 on:
   schedule:
-    - cron: "0 13 * * 1"
+    - cron: "0 13 * * *"
   workflow_dispatch:
     inputs:
       query:
-        description: "Consulta para escolher artigo"
+        description: "Consulta ou tema manual"
         required: false
-        default: "orofacial harmonization benefits"
 
 jobs:
   generate:
@@ -25,6 +24,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
       - name: Generate post
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -32,12 +34,12 @@ jobs:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ]; then
-            echo "Missing secrets. Configure pelo menos 1: OPENAI_API_KEY, ANTHROPIC_API_KEY ou GOOGLE_API_KEY em Settings -> Secrets and variables -> Actions." >&2
+            echo "Missing AI secrets." >&2
             exit 1
           fi
           QUERY="${{ github.event.inputs.query }}"
-          if [ -z "$QUERY" ]; then QUERY="harmonização facial benefícios"; fi
-          python -u scripts/weekly_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini" --query "$QUERY"
+          if [ -z "$QUERY" ]; then QUERY="auto"; fi
+          python -u scripts/daily_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini" --query "$QUERY"
 
       - name: Create pull request
         id: cpr
@@ -45,14 +47,14 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.GH_PAT != '' && secrets.GH_PAT || github.token }}
-          commit-message: "chore: gerar rascunho de post semanal"
-          title: "Rascunho: post semanal (harmonização)"
-          body: "Gerado automaticamente pelo workflow semanal."
-          branch: "automation/weekly-post"
+          commit-message: "chore: gerar rascunho de post diário"
+          title: "Rascunho: Post Diário (Instagram)"
+          body: "Gerado automaticamente pelo workflow diário. Por favor, revise as informações e faça o merge para publicar."
+          branch: "automation/daily-post"
           labels: automation
           add-paths: |
-            content/weekly-posts/*.md
-            content/weekly-posts/*.json
+            content/daily-posts/*.md
+            content/daily-posts/*.json
 
       - name: Auto-approve and auto-merge
         if: steps.cpr.outputs.pull-request-number != '' && secrets.GH_PAT != ''
@@ -65,7 +67,13 @@ jobs:
           echo "Enabling auto-merge for PR #${PR_NUMBER}"
           gh pr merge "${PR_NUMBER}" --squash --auto --delete-branch --repo "${{ github.repository }}" || true
 
-      - name: Manual PR link (if needed)
+      - name: Send WhatsApp Notification
+        if: steps.cpr.outputs.pull-request-url != ''
+        env:
+          WHATSAPP_API_KEY: ${{ secrets.WHATSAPP_API_KEY }}
+          PR_URL: ${{ steps.cpr.outputs.pull-request-url }}
         run: |
-          echo "Se a criação automática de PR falhar por permissão, abra manualmente:"
-          echo "https://github.com/${{ github.repository }}/pull/new/automation/weekly-post"
+          if [ -n "$WHATSAPP_API_KEY" ]; then
+            MSG="Novo rascunho de post do Instagram pra aprovar!%0AAnalise aqui: ${PR_URL}"
+            curl -X GET "https://api.callmebot.com/whatsapp.php?phone=5511995505765&text=${MSG}&apikey=${WHATSAPP_API_KEY}"
+          fi
