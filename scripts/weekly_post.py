@@ -281,6 +281,11 @@ def main() -> int:
         action="store_true",
         help="Falha se OPENAI_API_KEY não estiver configurada",
     )
+    parser.add_argument(
+        "--fallback-on-openai-error",
+        action="store_true",
+        help="Em erro da OpenAI (ex.: quota), gera rascunho sem IA em vez de falhar",
+    )
     args = parser.parse_args()
 
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -336,8 +341,11 @@ def main() -> int:
         },
     }
 
-    if args.dry_run or not api_key:
-        result = {
+    def draft_result(extra_disclaimer: str | None = None) -> dict:
+        disclaimer = "Resultados variam. Avaliação individual é indispensável."
+        if extra_disclaimer:
+            disclaimer = disclaimer + " " + extra_disclaimer.strip()
+        return {
             "source_title": item["title"],
             "source_url": item["link"],
             "caption": (
@@ -367,11 +375,22 @@ def main() -> int:
             "alt_text": "Retrato editorial em ambiente clínico sofisticado, estética premium e iluminação suave.",
             "posting_suggestion": "Terça-feira, 12h–14h. Fixar nos destaques por 7 dias.",
             "story_idea": "Enquete: qual sua maior dúvida sobre harmonização facial? Responda e eu explico.",
-            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "disclaimer": disclaimer,
         }
+
+    if args.dry_run or not api_key:
+        result = draft_result()
     else:
-        result = openai_chat_json(api_key=api_key, model=args.model, seed=seed, context=context)
-        result = ensure_fields(result)
+        try:
+            result = openai_chat_json(api_key=api_key, model=args.model, seed=seed, context=context)
+            result = ensure_fields(result)
+        except RuntimeError as e:
+            msg = str(e)
+            is_quota = "insufficient_quota" in msg or "HTTP 429" in msg
+            if args.fallback_on_openai_error and is_quota:
+                result = draft_result("Rascunho gerado sem IA por limitação de quota da API.")
+            else:
+                raise
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

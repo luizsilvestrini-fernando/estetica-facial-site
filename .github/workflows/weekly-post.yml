@@ -35,7 +35,7 @@ jobs:
           fi
           QUERY="${{ github.event.inputs.query }}"
           if [ -z "$QUERY" ]; then QUERY="harmonização facial benefícios"; fi
-          python -u scripts/weekly_post.py --require-openai --query "$QUERY"
+          python -u scripts/weekly_post.py --require-openai --fallback-on-openai-error --query "$QUERY"
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
