@@ -1,15 +1,5 @@
 """
-publish_instagram.py — Publica um post no Instagram via instagrapi.
-
-Fluxo:
-  1. Lê o JSON mais recente em content/weekly-posts/
-  2. Gera uma imagem a partir do image_prompt (via pollinations.ai)
-  3. Faz login no Instagram com username/password
-  4. Publica a foto com legenda no feed
-
-Secrets necessários (GitHub Secrets):
-  - IG_USERNAME   — Username do Instagram (ex: dra.brunasilvestrini)
-  - IG_PASSWORD   — Senha do Instagram
+publish_instagram.py — Publica post ou vídeo no Instagram via instagrapi.
 """
 
 import json
@@ -17,6 +7,7 @@ import os
 import sys
 import ssl
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -24,13 +15,11 @@ from pathlib import Path
 
 
 def ssl_context() -> ssl.SSLContext:
-    """Return SSL context, falling back to unverified for macOS compatibility."""
     ctx = ssl._create_unverified_context()
     return ctx
 
 
-def find_latest_post_json(posts_dir: str = "content/weekly-posts") -> Path:
-    """Find the most recent .json post file."""
+def find_latest_post_json(posts_dir: str = "content/daily-posts") -> Path:
     d = Path(posts_dir)
     json_files = sorted(d.glob("*.json"), reverse=True)
     if not json_files:
@@ -39,14 +28,10 @@ def find_latest_post_json(posts_dir: str = "content/weekly-posts") -> Path:
 
 
 def download_image(url: str, dest: Path) -> Path:
-    """Download an image from a URL to a local file."""
     ctx = ssl_context()
     req = urllib.request.Request(
         url,
-        headers={
-            "User-Agent": "instagram-poster/1.0",
-            "Accept": "image/*",
-        },
+        headers={"User-Agent": "instagram-poster/1.0", "Accept": "image/*"},
     )
     with urllib.request.urlopen(req, timeout=120, context=ctx) as res:
         data = res.read()
@@ -55,9 +40,89 @@ def download_image(url: str, dest: Path) -> Path:
 
 
 def build_image_url(prompt: str) -> str:
-    """Build a public image URL from the prompt using pollinations.ai."""
     encoded = urllib.parse.quote(prompt, safe="")
     return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true"
+
+
+def generate_endcard_image(out_path: str):
+    """Gera o letreiro final usando PIL sem depender de ImageMagick."""
+    from PIL import Image, ImageDraw, ImageFont
+    # Fundo rosa claro
+    img = Image.new("RGB", (1080, 1080), color=(255, 246, 248))
+    draw = ImageDraw.Draw(img)
+
+    # Tenta carregar a logo do repositório
+    logo_path = Path("assets/logo_bs_pink_1770921996696.png")
+    if logo_path.exists():
+        try:
+            logo = Image.open(logo_path).convert("RGBA")
+            # Redimensiona logo
+            logo.thumbnail((500, 500))
+            x_pos = (1080 - logo.width) // 2
+            y_pos = 300
+            img.paste(logo, (x_pos, y_pos), mask=logo)
+        except Exception as e:
+            print(f"Aviso: Falha ao carregar logo: {e}")
+
+    # Fonte fallback
+    try:
+        font = ImageFont.truetype("arial.ttf", 46)
+        font_large = ImageFont.truetype("arial.ttf", 60)
+    except IOError:
+        font = ImageFont.load_default()
+        font_large = font
+
+    text = "Agende sua avaliação GRATUITA pelo WhatsApp!"
+    number = "(11) 99550-5765"
+
+    try:
+        bb1 = draw.textbbox((0, 0), text, font=font)
+        w1 = bb1[2] - bb1[0]
+        bb2 = draw.textbbox((0, 0), number, font=font_large)
+        w2 = bb2[2] - bb2[0]
+    except AttributeError:
+        # Fallback para Pillow antigas
+        w1, _ = draw.textsize(text, font=font)
+        w2, _ = draw.textsize(number, font=font_large)
+
+    draw.text(((1080 - w1) // 2, 800), text, fill=(50, 50, 50), font=font)
+    draw.text(((1080 - w2) // 2, 860), number, fill=(210, 50, 100), font=font_large)
+
+    img.save(out_path)
+
+
+def make_video(image_path: str, transcript: str, out_path: str):
+    """Cria o clipe mp4 juntando TTS, imagem e letreiro no final."""
+    print("🎬 Iniciando processamento de VÍDEO...")
+    try:
+        from gtts import gTTS
+        from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
+    except ImportError:
+        raise RuntimeError("Dependências 'gTTS' ou 'moviepy' não instaladas. Rode pip install gTTS moviepy.")
+
+    tmp_dir = Path(image_path).parent
+
+    # 1. Gerar TTS
+    audio_path = str(tmp_dir / "tts_audio.mp3")
+    print(f"🎵 Gerando áudio TTS com texto: '{transcript[:50]}...'")
+    tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
+    tts.save(audio_path)
+
+    # 2. Clips principais
+    audio_clip = AudioFileClip(audio_path)
+    main_img_clip = ImageClip(image_path).set_duration(audio_clip.duration)
+    main_img_clip = main_img_clip.set_audio(audio_clip)
+
+    # 3. Clip do letreiro final (Endcard)
+    endcard_path = str(tmp_dir / "endcard.jpg")
+    generate_endcard_image(endcard_path)
+    endcard_clip = ImageClip(endcard_path).set_duration(3.5) # Tela final com logo fica 3,5 seg
+
+    # 4. Concatenar e renderizar
+    final_clip = concatenate_videoclips([main_img_clip, endcard_clip], method="compose")
+    print("⏳ Renderizando arquivo MP4...")
+    final_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac")
+    print(f"✅ Vídeo gerado em {out_path}")
 
 
 def main() -> int:
@@ -65,21 +130,15 @@ def main() -> int:
     ig_password = os.environ.get("IG_PASSWORD", "").strip()
 
     if not ig_username or not ig_password:
-        print(
-            "❌ Variáveis IG_USERNAME e IG_PASSWORD são obrigatórias.\n"
-            "Configure em GitHub > Settings > Secrets and variables > Actions.",
-            file=sys.stderr,
-        )
+        print("❌ Variáveis IG_USERNAME e IG_PASSWORD são obrigatórias.", file=sys.stderr)
         return 1
 
-    # Importar instagrapi aqui para falhar cedo se não instalado
     try:
         from instagrapi import Client
     except ImportError:
-        print("❌ Biblioteca 'instagrapi' não encontrada. Instale com: pip install instagrapi", file=sys.stderr)
+        print("❌ Biblioteca 'instagrapi' não encontrada.", file=sys.stderr)
         return 1
 
-    # Localizar o JSON do post
     post_path = os.environ.get("POST_JSON_PATH", "")
     if post_path:
         post_file = Path(post_path)
@@ -94,46 +153,43 @@ def main() -> int:
     image_prompt = post_data.get("image_prompt", "")
     image_url = post_data.get("image_url", "")
     disclaimer = post_data.get("disclaimer", "")
+    is_video = post_data.get("is_video", False)
+    video_script = post_data.get("video_script", "")
 
     if not image_url:
-        if not image_prompt:
-            print("❌ Sem image_url nem image_prompt no JSON.", file=sys.stderr)
-            return 1
-        print("🎨 Gerando imagem a partir do prompt...")
+        print("🎨 Gerando imagem de fundo a partir do prompt...")
         image_url = build_image_url(image_prompt)
 
-    # Montar legenda final
-    hashtag_str = " ".join(
-        [h if h.startswith("#") else f"#{h}" for h in hashtags]
-    )
+    hashtag_str = " ".join([h if h.startswith("#") else f"#{h}" for h in hashtags])
     full_caption = caption.strip()
     if hashtag_str:
         full_caption += "\n\n" + hashtag_str.strip()
     if disclaimer:
         full_caption += "\n\n⚠️ " + disclaimer.strip()
 
-    print(f"📸 Imagem URL: {image_url[:100]}...")
-    print(f"📝 Legenda ({len(full_caption)} chars)")
-
-    # Baixar a imagem
     with tempfile.TemporaryDirectory() as tmpdir:
         img_path = Path(tmpdir) / "post_image.jpg"
-        print("⬇️  Baixando imagem...")
+        print("⬇️ Baixando imagem...")
         try:
             download_image(image_url, img_path)
         except Exception as e:
             print(f"❌ Falha ao baixar imagem: {e}", file=sys.stderr)
             return 1
-        print(f"✅ Imagem salva ({img_path.stat().st_size / 1024:.1f} KB)")
+            
+        media_path = img_path
+        
+        if is_video and video_script.strip():
+            vid_path = str(Path(tmpdir) / "post_video.mp4")
+            try:
+                make_video(str(img_path), video_script, vid_path)
+                media_path = Path(vid_path)
+            except Exception as e:
+                print(f"❌ Falha ao montar vídeo: {e}", file=sys.stderr)
+                return 1
 
-        # Login no Instagram
         print(f"\n🔐 Fazendo login como @{ig_username}...")
         cl = Client()
-
-        # Configurar delays para parecer humano e evitar bloqueios
         cl.delay_range = [3, 7]
-
-        # Tentar carregar sessão salva (evita login repetido)
         session_file = Path("ig_session.json")
         try:
             if session_file.exists():
@@ -145,69 +201,53 @@ def main() -> int:
                 print("✅ Login realizado!")
             cl.dump_settings(session_file)
         except Exception as e:
-            print(f"⚠️  Erro no login com sessão, tentando login limpo: {e}")
             try:
                 cl = Client()
                 cl.delay_range = [3, 7]
                 cl.login(ig_username, ig_password)
                 cl.dump_settings(session_file)
-                print("✅ Login realizado (sem sessão prévia)!")
             except Exception as login_err:
                 print(f"❌ Falha no login do Instagram: {login_err}", file=sys.stderr)
-                print(
-                    "\nPossíveis causas:\n"
-                    "  - Senha incorreta\n"
-                    "  - Autenticação de dois fatores (2FA) ativada\n"
-                    "  - Instagram bloqueou login de localização desconhecida\n"
-                    "  - Muitas tentativas de login recentes",
-                    file=sys.stderr,
-                )
                 return 1
 
-        # Publicar no feed
         print("\n📤 Publicando no feed do Instagram...")
         try:
-            media = cl.photo_upload(
-                path=img_path,
-                caption=full_caption,
-            )
+            if is_video:
+                media = cl.video_upload(path=media_path, caption=full_caption)
+            else:
+                media = cl.photo_upload(path=media_path, caption=full_caption)
+                
             print(f"\n🎉 Post publicado com sucesso!")
             print(f"   Media ID: {media.pk}")
-            print(f"   URL: https://www.instagram.com/p/{media.code}/")
-            print(f"   Perfil: https://www.instagram.com/{ig_username}/")
+            ig_url = f"https://www.instagram.com/p/{media.code}/"
+            print(f"   URL: {ig_url}")
+            
+            # Repassar URL pro GitHub Actions
+            if "GITHUB_OUTPUT" in os.environ:
+                with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                    f.write(f"ig_url={ig_url}\n")
+                    
         except Exception as e:
             print(f"❌ Falha ao publicar: {e}", file=sys.stderr)
             return 1
 
-        # Auto-comentário com link clicável do WhatsApp
-        import time
-        time.sleep(5)  # Esperar post processar
-
-        whatsapp_comment = (
-            "✨ Quer saber mais sobre esse procedimento?\n"
-            "📲 Agende sua avaliação GRATUITA pelo WhatsApp:\n"
-            "👉 https://wa.me/5511995505765\n"
-            "\n"
-            "Ou mande uma mensagem direta aqui! 💬"
-        )
-
         print("\n💬 Adicionando comentário com link do WhatsApp...")
+        time.sleep(5)
+        whatsapp_comment = (
+            "✨ Quer saber mais ou fazer uma avaliação?\n"
+            "📲 Agende conosco pelo WhatsApp clicando aqui:\n"
+            "👉 https://wa.me/5511995505765\n"
+        )
         try:
             comment = cl.media_comment(media.pk, whatsapp_comment)
-            print(f"✅ Comentário adicionado (ID: {comment.pk})")
-
-            # Tentar fixar o comentário no topo
             try:
                 cl.comment_pin(media.pk, comment.pk)
-                print("📌 Comentário fixado no topo!")
-            except Exception as pin_err:
-                print(f"⚠️  Não foi possível fixar o comentário (normal em algumas contas): {pin_err}")
+            except Exception:
+                pass
         except Exception as comment_err:
-            print(f"⚠️  Comentário não adicionado: {comment_err}")
-            print("   O post foi publicado com sucesso, mas sem o comentário do WhatsApp.")
+            print(f"⚠️ Comentário não adicionado: {comment_err}")
 
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
