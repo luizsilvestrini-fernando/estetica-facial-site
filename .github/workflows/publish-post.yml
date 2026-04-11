@@ -56,15 +56,16 @@ jobs:
           fi
           python -u scripts/publish_instagram.py
 
-      - name: Send WhatsApp Notification (Success)
+      - name: Send Telegram Notification (Success)
         if: success() && steps.pub.outputs.ig_url != ''
         env:
-          WHATSAPP_API_KEY: ${{ secrets.WHATSAPP_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           LIVE_URL: ${{ steps.pub.outputs.ig_url }}
         run: |
-          if [ -n "$WHATSAPP_API_KEY" ]; then
-            MSG="🎉 Post diário publicado com sucesso! Confira:%0A${LIVE_URL}"
-            curl -X GET "https://api.callmebot.com/whatsapp.php?phone=5511995505765&text=${MSG}&apikey=${WHATSAPP_API_KEY}"
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            MSG="🎉 Seu post foi publicado com sucesso no Instagram!%0AConfira ao vivo:%0A${LIVE_URL}"
+            curl -s -X GET "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}"
           fi
 
       - name: Notify on failure

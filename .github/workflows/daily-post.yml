@@ -2,7 +2,7 @@ name: Daily Post Draft
 
 on:
   schedule:
-    - cron: "0 13 * * *"
+    - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
       query:
@@ -56,24 +56,11 @@ jobs:
             content/daily-posts/*.md
             content/daily-posts/*.json
 
-      - name: Auto-approve and auto-merge
-        if: steps.cpr.outputs.pull-request-number != '' && secrets.GH_PAT != ''
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          PR_NUMBER="${{ steps.cpr.outputs.pull-request-number }}"
-          echo "Auto-approving PR #${PR_NUMBER}"
-          gh pr review "${PR_NUMBER}" --approve --repo "${{ github.repository }}"
-          echo "Enabling auto-merge for PR #${PR_NUMBER}"
-          gh pr merge "${PR_NUMBER}" --squash --auto --delete-branch --repo "${{ github.repository }}" || true
-
-      - name: Send WhatsApp Notification
+      - name: Send Telegram Notification
         if: steps.cpr.outputs.pull-request-url != ''
         env:
-          WHATSAPP_API_KEY: ${{ secrets.WHATSAPP_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PR_URL: ${{ steps.cpr.outputs.pull-request-url }}
         run: |
-          if [ -n "$WHATSAPP_API_KEY" ]; then
-            MSG="Novo rascunho de post do Instagram pra aprovar!%0AAnalise aqui: ${PR_URL}"
-            curl -X GET "https://api.callmebot.com/whatsapp.php?phone=5511995505765&text=${MSG}&apikey=${WHATSAPP_API_KEY}"
-          fi
+          python scripts/send_telegram.py
