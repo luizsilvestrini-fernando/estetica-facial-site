@@ -66,13 +66,34 @@ document.addEventListener('DOMContentLoaded', () => {
     // 4. Google Ads Conversion Tracking para Botões do WhatsApp
     const whatsappLinks = document.querySelectorAll('a[href*="wa.me"]');
     whatsappLinks.forEach(link => {
-        link.addEventListener('click', () => {
+        link.addEventListener('click', (event) => {
+            const href = link.href;
+            const openInNewTab = (link.getAttribute('target') || '').toLowerCase() === '_blank';
+
+            if (typeof fbq === 'function') {
+                fbq('track', 'Contact');
+            }
+
             if (typeof gtag === 'function') {
-                // ID da conta: AW-16663688962 | Rótulo de conversão WhatsApp
+                if (!openInNewTab) {
+                    event.preventDefault();
+                }
+
                 gtag('event', 'conversion', {
-                    'send_to': 'AW-16663688962/0lmZCJaEmY4cEILu7ok-'
+                    send_to: 'AW-16663688962/0lmZCJaEmY4cEILu7ok-',
+                    event_callback: () => {
+                        if (!openInNewTab) {
+                            window.location.href = href;
+                        }
+                    },
+                    event_timeout: 1500
                 });
-                console.log('Evento de conversão do WhatsApp disparado.');
+
+                if (!openInNewTab) {
+                    window.setTimeout(() => {
+                        window.location.href = href;
+                    }, 1700);
+                }
             }
         });
     });
