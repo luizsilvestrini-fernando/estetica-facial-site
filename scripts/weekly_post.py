@@ -113,6 +113,15 @@ def fetch_pubmed_latest(term: str, *, context: ssl.SSLContext) -> dict:
     }
 
 
+def fetch_google_news_first(query: str, *, context: ssl.SSLContext) -> dict:
+    rss_url = rss_url_for_query(query, "google-news")
+    rss_bytes = fetch_bytes(rss_url, context=context)
+    items = parse_rss_items(rss_bytes)
+    if not items:
+        raise ValueError("Google News RSS: nenhum item encontrado")
+    return items[0]
+
+
 def openai_chat_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLContext) -> dict:
     url = "https://api.openai.com/v1/chat/completions"
     payload = {
@@ -284,15 +293,25 @@ def main() -> int:
 
     try:
         if args.rss_source == "pubmed":
-            item = fetch_pubmed_latest(q, context=context)
+            try:
+                item = fetch_pubmed_latest(q, context=context)
+            except ValueError:
+                fallback_terms = [
+                    "orofacial harmonization",
+                    "facial harmonization",
+                    "hyaluronic acid filler",
+                ]
+                item = None
+                for term in fallback_terms:
+                    try:
+                        item = fetch_pubmed_latest(term, context=context)
+                        break
+                    except ValueError:
+                        item = None
+                if item is None:
+                    item = fetch_google_news_first(q, context=context)
         else:
-            rss_url = rss_url_for_query(q, args.rss_source)
-            rss_bytes = fetch_bytes(rss_url, context=context)
-            items = parse_rss_items(rss_bytes)
-            if not items:
-                print("Nenhum item encontrado no RSS", file=sys.stderr)
-                return 3
-            item = items[0]
+            item = fetch_google_news_first(q, context=context)
     except Exception as e:
         if isinstance(e, urllib.error.URLError) and "CERTIFICATE_VERIFY_FAILED" in str(e):
             print(
