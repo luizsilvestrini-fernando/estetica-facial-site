@@ -136,9 +136,22 @@ def openai_chat_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLCo
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=60, context=context) as res:
-        body = res.read().decode("utf-8")
-    parsed = json.loads(body)
+    try:
+        with urllib.request.urlopen(req, timeout=60, context=context) as res:
+            body = res.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8")
+        except Exception:
+            err_body = ""
+        raise RuntimeError(f"OpenAI HTTP {e.code}: {err_body or e.reason}")
+
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        snippet = body[:800]
+        raise RuntimeError(f"OpenAI retornou resposta inválida (não-JSON): {snippet}")
     content = (
         parsed.get("choices", [{}])[0]
         .get("message", {})
@@ -150,7 +163,11 @@ def openai_chat_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLCo
         content = re.sub(r"^```[a-zA-Z]*\n", "", content)
         content = re.sub(r"\n```$", "", content)
         content = content.strip()
-    return json.loads(content)
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        snippet = content[:1200]
+        raise RuntimeError(f"Modelo não retornou JSON válido. Conteúdo: {snippet}")
 
 
 def ensure_fields(obj: dict) -> dict:

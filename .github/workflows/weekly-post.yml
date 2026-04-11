@@ -13,6 +13,8 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     permissions:
       contents: write
       pull-requests: write
@@ -27,9 +29,13 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Missing secret OPENAI_API_KEY. Configure em Settings -> Secrets and variables -> Actions." >&2
+            exit 1
+          fi
           QUERY="${{ github.event.inputs.query }}"
           if [ -z "$QUERY" ]; then QUERY="harmonização facial benefícios"; fi
-          python scripts/weekly_post.py --require-openai --query "$QUERY"
+          python -u scripts/weekly_post.py --require-openai --query "$QUERY"
 
       - name: Create pull request
         uses: peter-evans/create-pull-request@v6
