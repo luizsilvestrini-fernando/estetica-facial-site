@@ -40,6 +40,7 @@ jobs:
           python -u scripts/weekly_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini" --query "$QUERY"
 
       - name: Create pull request
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         continue-on-error: true
         with:
@@ -48,9 +49,21 @@ jobs:
           title: "Rascunho: post semanal (harmonização)"
           body: "Gerado automaticamente pelo workflow semanal."
           branch: "automation/weekly-post"
+          labels: automation
           add-paths: |
             content/weekly-posts/*.md
             content/weekly-posts/*.json
+
+      - name: Auto-approve and auto-merge
+        if: steps.cpr.outputs.pull-request-number != '' && secrets.GH_PAT != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          PR_NUMBER="${{ steps.cpr.outputs.pull-request-number }}"
+          echo "Auto-approving PR #${PR_NUMBER}"
+          gh pr review "${PR_NUMBER}" --approve --repo "${{ github.repository }}"
+          echo "Enabling auto-merge for PR #${PR_NUMBER}"
+          gh pr merge "${PR_NUMBER}" --squash --auto --delete-branch --repo "${{ github.repository }}" || true
 
       - name: Manual PR link (if needed)
         run: |
