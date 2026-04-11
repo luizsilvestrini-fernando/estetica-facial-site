@@ -1,0 +1,43 @@
+name: Weekly Post Draft
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      query:
+        description: "Consulta para escolher artigo"
+        required: false
+        default: "harmonização facial benefícios"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate post
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          QUERY="${{ github.event.inputs.query }}"
+          if [ -z "$QUERY" ]; then QUERY="harmonização facial benefícios"; fi
+          python scripts/weekly_post.py --require-openai --query "$QUERY"
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: gerar rascunho de post semanal"
+          title: "Rascunho: post semanal (harmonização)"
+          body: "Gerado automaticamente pelo workflow semanal."
+          branch: "automation/weekly-post"
+          add-paths: |
+            content/weekly-posts/*.md
+            content/weekly-posts/*.json

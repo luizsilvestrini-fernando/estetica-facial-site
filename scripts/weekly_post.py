@@ -1,0 +1,353 @@
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import ssl
+import sys
+import urllib.parse
+import urllib.error
+import urllib.request
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+
+def ssl_context(insecure: bool) -> ssl.SSLContext:
+    if insecure:
+        return ssl._create_unverified_context()
+    return ssl.create_default_context()
+
+
+def fetch_bytes(url: str, timeout: int = 20, *, context: ssl.SSLContext) -> bytes:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "weekly-post-generator/1.0",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout, context=context) as res:
+        return res.read()
+
+
+def parse_rss_items(xml_bytes: bytes) -> list[dict]:
+    root = ET.fromstring(xml_bytes)
+    channel = root.find("channel")
+    if channel is None:
+        return []
+
+    items: list[dict] = []
+    for item in channel.findall("item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        description = (item.findtext("description") or "").strip()
+        pub_date = (item.findtext("pubDate") or "").strip()
+
+        if not title or not link:
+            continue
+
+        items.append(
+            {
+                "title": title,
+                "link": link,
+                "description": strip_html(description),
+                "pub_date": pub_date,
+            }
+        )
+
+    return items
+
+
+def strip_html(text: str) -> str:
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def rss_url_for_query(query: str, source: str) -> str:
+    return (
+        "https://news.google.com/rss/search?q="
+        + urllib.parse.quote(query)
+        + "&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+    )
+
+
+def fetch_json(url: str, *, context: ssl.SSLContext, timeout: int = 30) -> dict:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "weekly-post-generator/1.0",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=timeout, context=context) as res:
+        return json.loads(res.read().decode("utf-8"))
+
+
+def fetch_pubmed_latest(term: str, *, context: ssl.SSLContext) -> dict:
+    esearch_url = (
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmax=5&sort=date&term="
+        + urllib.parse.quote(term)
+    )
+    xml_bytes = fetch_bytes(esearch_url, timeout=30, context=context)
+    root = ET.fromstring(xml_bytes)
+    ids = [el.text.strip() for el in root.findall(".//IdList/Id") if el.text and el.text.strip()]
+    if not ids:
+        raise ValueError("PubMed: nenhum ID encontrado")
+
+    pmid = ids[0]
+    esummary_url = (
+        "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id="
+        + urllib.parse.quote(pmid)
+    )
+    data = fetch_json(esummary_url, context=context)
+    result = data.get("result", {}).get(pmid, {})
+    title = (result.get("title") or "").strip().rstrip(".")
+    pubdate = (result.get("pubdate") or "").strip()
+
+    return {
+        "title": title or f"PubMed PMID {pmid}",
+        "link": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+        "description": "",
+        "pub_date": pubdate,
+    }
+
+
+def openai_chat_json(api_key: str, model: str, seed: dict, *, context: ssl.SSLContext) -> dict:
+    url = "https://api.openai.com/v1/chat/completions"
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Você é um redator de conteúdo para clínica premium de harmonização facial. Responda SOMENTE em JSON válido (sem markdown). Use português (pt-BR). Não faça promessas de resultado. Inclua disclaimer curto. Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer.",
+            },
+            {"role": "user", "content": json.dumps(seed, ensure_ascii=False)},
+        ],
+        "temperature": 0.7,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=60, context=context) as res:
+        body = res.read().decode("utf-8")
+    parsed = json.loads(body)
+    content = (
+        parsed.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+        .strip()
+    )
+    content = content.strip()
+    if content.startswith("```"):
+        content = re.sub(r"^```[a-zA-Z]*\n", "", content)
+        content = re.sub(r"\n```$", "", content)
+        content = content.strip()
+    return json.loads(content)
+
+
+def ensure_fields(obj: dict) -> dict:
+    required = [
+        "source_title",
+        "source_url",
+        "caption",
+        "hashtags",
+        "image_prompt",
+        "alt_text",
+        "posting_suggestion",
+        "story_idea",
+        "disclaimer",
+    ]
+    missing = [k for k in required if k not in obj]
+    if missing:
+        raise ValueError(f"JSON missing fields: {', '.join(missing)}")
+    if not isinstance(obj.get("hashtags"), list):
+        raise ValueError("hashtags must be an array")
+    return obj
+
+
+def image_url_from_prompt(prompt: str, image_size: str = "square_hd") -> str:
+    encoded = urllib.parse.quote(prompt, safe="")
+    return f"https://coresg-normal.trae.ai/api/ide/v1/text_to_image?prompt={encoded}&image_size={image_size}"
+
+
+def render_markdown(today: str, result: dict) -> str:
+    hashtags = " ".join([h if h.startswith("#") else f"#{h}" for h in result["hashtags"]])
+    img_url = image_url_from_prompt(result["image_prompt"], image_size="square_hd")
+    return "\n".join(
+        [
+            f"# Post semanal — {today}",
+            "",
+            "## Fonte",
+            f"- {result['source_title']}",
+            f"- {result['source_url']}",
+            "",
+            "## Legenda", 
+            result["caption"].strip(),
+            "",
+            "## Hashtags",
+            hashtags.strip(),
+            "",
+            "## Prompt de imagem",
+            result["image_prompt"].strip(),
+            "",
+            "## URL de imagem (opcional)",
+            img_url,
+            "",
+            "## Alt text",
+            result["alt_text"].strip(),
+            "",
+            "## Sugestão de postagem",
+            result["posting_suggestion"].strip(),
+            "",
+            "## Ideia de story",
+            result["story_idea"].strip(),
+            "",
+            "## Disclaimer",
+            result["disclaimer"].strip(),
+            "",
+        ]
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--query",
+        default="facial fillers aesthetic",
+        help="Consulta para buscar fontes em RSS",
+    )
+    parser.add_argument(
+        "--rss-source",
+        choices=["pubmed", "google-news"],
+        default="pubmed",
+        help="Fonte de RSS para selecionar o artigo",
+    )
+    parser.add_argument(
+        "--out-dir",
+        default="content/weekly-posts",
+        help="Diretório para salvar o markdown gerado",
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
+        help="Modelo OpenAI (padrão via OPENAI_MODEL)",
+    )
+    parser.add_argument(
+        "--insecure-ssl",
+        action="store_true",
+        help="Desabilita verificação SSL (use só para debug local)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Gera saída sem chamar OpenAI (para testar pipeline)",
+    )
+    parser.add_argument(
+        "--require-openai",
+        action="store_true",
+        help="Falha se OPENAI_API_KEY não estiver configurada",
+    )
+    args = parser.parse_args()
+
+    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if args.require_openai and not api_key:
+        print("OPENAI_API_KEY não configurada", file=sys.stderr)
+        return 2
+
+    q = args.query.strip() or "harmonização facial benefícios"
+    context = ssl_context(args.insecure_ssl)
+
+    try:
+        if args.rss_source == "pubmed":
+            item = fetch_pubmed_latest(q, context=context)
+        else:
+            rss_url = rss_url_for_query(q, args.rss_source)
+            rss_bytes = fetch_bytes(rss_url, context=context)
+            items = parse_rss_items(rss_bytes)
+            if not items:
+                print("Nenhum item encontrado no RSS", file=sys.stderr)
+                return 3
+            item = items[0]
+    except Exception as e:
+        if isinstance(e, urllib.error.URLError) and "CERTIFICATE_VERIFY_FAILED" in str(e):
+            print(
+                "Falha de SSL no Python local. No macOS, instale certificados do Python (Install Certificates.command) ou rode com --insecure-ssl.",
+                file=sys.stderr,
+            )
+        raise
+    today = dt.date.today().isoformat()
+    seed = {
+        "topic": "harmonização facial",
+        "query": q,
+        "article": {
+            "title": item["title"],
+            "url": item["link"],
+            "snippet": item.get("description", ""),
+            "published_at": item.get("pub_date", ""),
+        },
+        "brand": {
+            "name": "Dra. Bruna Silvestrini",
+            "tone": "premium",
+            "cta": "Agende pelo WhatsApp",
+        },
+    }
+
+    if args.dry_run or not api_key:
+        result = {
+            "source_title": item["title"],
+            "source_url": item["link"],
+            "caption": (
+                f"Tema da semana: {item['title']}\n\n"
+                "Na harmonização facial, pequenas estratégias podem valorizar traços com naturalidade. "
+                "Se quiser entender o que faz sentido para o seu caso, a avaliação individual é o primeiro passo.\n\n"
+                "Agende pelo WhatsApp." 
+            ),
+            "hashtags": [
+                "harmonizacaofacial",
+                "esteticafacial",
+                "saudedapele",
+                "preenchimentofacial",
+                "toxina",
+                "beleza",
+                "autocuidado",
+                "odontologia",
+                "orofacial",
+                "saopaulo",
+            ],
+            "image_prompt": (
+                "Retrato editorial premium de uma mulher adulta, pele natural luminosa, "
+                "clínica sofisticada minimalista, tons champagne e branco, iluminação suave difusa, "
+                "profundidade de campo rasa, 85mm, ultra-detalhe, realista, alta resolução; "
+                "sem texto, sem logotipos"
+            ),
+            "alt_text": "Retrato editorial em ambiente clínico sofisticado, estética premium e iluminação suave.",
+            "posting_suggestion": "Terça-feira, 12h–14h. Fixar nos destaques por 7 dias.",
+            "story_idea": "Enquete: qual sua maior dúvida sobre harmonização facial? Responda e eu explico.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+        }
+    else:
+        result = openai_chat_json(api_key=api_key, model=args.model, seed=seed, context=context)
+        result = ensure_fields(result)
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / f"{today}.md"
+    out_file.write_text(render_markdown(today, result), encoding="utf-8")
+
+    meta_file = out_dir / f"{today}.json"
+    meta_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    print(str(out_file))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
