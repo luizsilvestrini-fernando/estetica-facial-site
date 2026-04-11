@@ -1,4 +1,34 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const consentBanner = document.getElementById('consent-banner');
+    const acceptBtn = document.getElementById('consent-accept');
+    const declineBtn = document.getElementById('consent-decline');
+
+    if (consentBanner && typeof window.__trackingConsent === 'string' && window.__trackingConsent !== 'granted' && window.__trackingConsent !== 'denied') {
+        consentBanner.hidden = false;
+    }
+
+    if (acceptBtn) {
+        acceptBtn.addEventListener('click', () => {
+            if (typeof window.setTrackingConsent === 'function') {
+                window.setTrackingConsent(true);
+            }
+            if (consentBanner) {
+                consentBanner.hidden = true;
+            }
+        });
+    }
+
+    if (declineBtn) {
+        declineBtn.addEventListener('click', () => {
+            if (typeof window.setTrackingConsent === 'function') {
+                window.setTrackingConsent(false);
+            }
+            if (consentBanner) {
+                consentBanner.hidden = true;
+            }
+        });
+    }
+
     // 1. Mobile Menu Toggle
     const mobileMenuBtn = document.querySelector('.mobile-menu-btn');
     const navLinks = document.querySelector('.nav-links');
@@ -67,6 +97,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const whatsappLinks = document.querySelectorAll('a[href*="wa.me"]');
     whatsappLinks.forEach(link => {
         link.addEventListener('click', (event) => {
+            if (window.__trackingConsent !== 'granted') {
+                return;
+            }
+
             const href = link.href;
             const openInNewTab = (link.getAttribute('target') || '').toLowerCase() === '_blank';
 

@@ -10,6 +10,38 @@
     <meta name="theme-color" content="#c9a764">
     <meta name="facebook-pixel-id" content="">
 
+    <script>
+        (function () {
+            var stored = '';
+            try {
+                stored = window.localStorage.getItem('tracking_consent') || '';
+            } catch (e) {
+                stored = '';
+            }
+
+            window.__trackingConsent = stored;
+            window.setTrackingConsent = function (granted) {
+                var next = granted ? 'granted' : 'denied';
+                window.__trackingConsent = next;
+                try {
+                    window.localStorage.setItem('tracking_consent', next);
+                } catch (e) {}
+
+                if (typeof window.gtag === 'function') {
+                    window.gtag('consent', 'update', {
+                        ad_storage: granted ? 'granted' : 'denied',
+                        ad_user_data: granted ? 'granted' : 'denied',
+                        ad_personalization: granted ? 'granted' : 'denied'
+                    });
+                }
+
+                if (granted && typeof window.__initMetaPixel === 'function') {
+                    window.__initMetaPixel();
+                }
+            };
+        })();
+    </script>
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,16 +58,25 @@
     <script>
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
+        gtag('consent', 'default', {
+            ad_storage: window.__trackingConsent === 'granted' ? 'granted' : 'denied',
+            ad_user_data: window.__trackingConsent === 'granted' ? 'granted' : 'denied',
+            ad_personalization: window.__trackingConsent === 'granted' ? 'granted' : 'denied'
+        });
         gtag('js', new Date());
 
         gtag('config', 'AW-16663688962');
     </script>
 
     <script>
-        (function () {
+        window.__initMetaPixel = function () {
             var meta = document.querySelector('meta[name="facebook-pixel-id"]');
             var pixelId = meta && meta.content ? meta.content.trim() : '';
             if (!pixelId) return;
+
+            if (typeof window.fbq === 'function' && window.fbq.loaded) {
+                return;
+            }
 
             !function (f, b, e, v, n, t, s) {
                 if (f.fbq) return;
@@ -56,7 +97,11 @@
 
             fbq('init', pixelId);
             fbq('track', 'PageView');
-        })();
+        };
+
+        if (window.__trackingConsent === 'granted') {
+            window.__initMetaPixel();
+        }
     </script>
 </head>
 
@@ -329,6 +374,15 @@
     </footer>
 
     <script src="js/script.js"></script>
+    <div id="consent-banner" class="consent-banner" hidden>
+        <div class="consent-banner__content">
+            <p>Usamos cookies e tecnologias de medição para melhorar sua experiência e mensurar campanhas.</p>
+            <div class="consent-banner__actions">
+                <button type="button" class="btn btn-outline" id="consent-decline">Recusar</button>
+                <button type="button" class="btn btn-primary" id="consent-accept">Aceitar</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
