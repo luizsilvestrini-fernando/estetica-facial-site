@@ -179,26 +179,41 @@ def call_anthropic(api_key: str, model: str, system_prompt: str, seed: dict, *, 
     return json.loads(text)
 
 def call_gemini(api_key: str, model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(model)}:generateContent?key={urllib.parse.quote(api_key)}"
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + json.dumps(seed, ensure_ascii=False)}]}],
-        "generationConfig": {"temperature": 0.7, "responseMimeType": "application/json"},
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, headers={"content-type": "application/json"}, method="POST"
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60, context=context) as res:
-            body = res.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Gemini falhou: {e.read().decode('utf-8')[:200]}")
-    parsed = json.loads(body)
-    candidates = parsed.get("candidates") or []
-    content = ((candidates[0] or {}).get("content") or {}) if candidates else {}
-    parts = content.get("parts") or []
-    text = "".join([p.get("text", "") for p in parts]).strip()
-    return json.loads(text)
+    models_to_try = [model, "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"]
+    last_error = ""
+
+    for m in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(api_key)}"
+        payload = {
+            "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + json.dumps(seed, ensure_ascii=False)}]}],
+            "generationConfig": {"temperature": 0.7},
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"content-type": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=60, context=context) as res:
+                body = res.read().decode("utf-8")
+                parsed = json.loads(body)
+                candidates = parsed.get("candidates") or []
+                content = ((candidates[0] or {}).get("content") or {}) if candidates else {}
+                parts = content.get("parts") or []
+                text = "".join([p.get("text", "") for p in parts]).strip()
+                if text.startswith("```"):
+                   text = re.sub(r"^```[a-zA-Z]*\n", "", text)
+                   text = re.sub(r"\n```$", "", text)
+                   text = text.strip()
+                return json.loads(text)
+        except urllib.error.HTTPError as e:
+            err_msg = e.read().decode("utf-8")[:200]
+            last_error = err_msg
+            print(f"Aviso interno: Falha ao usar {m}: {err_msg}")
+            if "not found" in err_msg.lower():
+                continue # Tenta o proximo modelo da lista
+            raise RuntimeError(f"Gemini falhou inesperadamente em {m}: {err_msg}")
+        except Exception as ex:
+             raise RuntimeError(f"Falha generica no comando Gemini: {ex}")
+             
+    raise RuntimeError(f"Todos os modelos do Gemini falharam! Último erro: {last_error}")
 
 def ensure_fields(obj: dict) -> dict:
     required = [
