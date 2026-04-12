@@ -41,7 +41,12 @@ def check_for_ok():
         
         # Confirma que é do chat correto
         if str(chat.get("id")) == str(chat_id_target):
-            if text in ["ok", "aprovar", "aprovado", "posta", "pode postar"]:
+            # Normaliza o texto removendo caracteres especiais e espaços extras
+            normalized_text = ''.join(c for c in text if c.isalnum() or c.isspace()).strip()
+            
+            # Verifica se alguma palavra-chave de aprovação está presente em qualquer parte da mensagem
+            approval_keywords = ["ok", "aprovar", "aprovado", "posta", "pode postar", "aprovado pra postar"]
+            if any(keyword in normalized_text for keyword in approval_keywords):
                 found_ok = True
                 print(f"👍 Comando de liberação recebido! (Mensagem: {text})")
 

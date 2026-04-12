@@ -231,11 +231,11 @@ def main() -> int:
                 print(f"❌ Falha no login do Instagram: {login_err}", file=sys.stderr)
                 return 1
 
-        print("\n📤 Publicando no Instagram (REELS)...")
+        print("\n📤 Publicando no Instagram...")
         time.sleep(5) # Pequeno fôlego para o FS
         try:
             if is_video:
-                media = cl.reels_upload(path=media_path, caption=full_caption)
+                media = cl.clip_upload(path=media_path, caption=full_caption)
             else:
                 media = cl.photo_upload(path=media_path, caption=full_caption)
                 
