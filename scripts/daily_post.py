@@ -410,6 +410,7 @@ def main() -> int:
     parser.add_argument("--fallback-to-draft-on-all-fail", action="store_true")
     parser.add_argument("--fallback-on-openai-error", action="store_true")
     parser.add_argument("--ai-provider-order", default="openai,anthropic,gemini,deepseek")
+    parser.add_argument("--mock-botox", action="store_true", help="Forçar tema de botox")
     args = parser.parse_args()
 
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -421,6 +422,14 @@ def main() -> int:
     context = ssl_context(args.insecure_ssl)
 
     weekday_theme = get_theme_for_today()
+    if args.mock_botox:
+        weekday_theme["name"] = "Antes e Depois - Procedimentos de Segunda (Mock)"
+        weekday_theme["instructions"] = (
+            "Faça um post narrando um caso de 'Antes e Depois' (uma transformação) de botox ou preenchimento facial. "
+            "Para o 'image_prompt', crie um cenário mostrando uma mulher sorrindo logo após o procedimento na clínica (foco no resultado lindo). "
+            "A imagem não será dividida, mas sim um resultado de excelência."
+        )
+
     print(f"🗓️ Tema do dia: {weekday_theme['name']}")
 
     seed = {
