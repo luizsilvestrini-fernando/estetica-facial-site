@@ -413,6 +413,7 @@ def main() -> int:
 
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    anthropic_key_fallback = os.environ.get("ANTHROPIC_API_KEY_FALLBACK", "").strip()
     gemini_key = os.environ.get("GOOGLE_API_KEY", "").strip()
     deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
 
@@ -459,12 +460,19 @@ def main() -> int:
                 break
             except Exception as e:
                 all_errors.append(f"OpenAI: {e}")
-        if provider == "anthropic" and anthropic_key:
-            try:
-                result = call_anthropic(api_key=anthropic_key, model=args.anthropic_model, system_prompt=system_prompt, seed=seed, context=context)
+        if provider == "anthropic":
+            a_keys = [anthropic_key, anthropic_key_fallback]
+            a_keys = [k for k in a_keys if k]
+            a_success = False
+            for k in a_keys:
+                try:
+                    result = call_anthropic(api_key=k, model=args.anthropic_model, system_prompt=system_prompt, seed=seed, context=context)
+                    a_success = True
+                    break
+                except Exception as e:
+                    all_errors.append(f"Anthropic (Chave terminada em {k[-4:]}): {e}")
+            if a_success:
                 break
-            except Exception as e:
-                all_errors.append(f"Anthropic: {e}")
         if provider == "gemini" and gemini_key:
             try:
                 result = call_gemini(api_key=gemini_key, model=args.gemini_model, system_prompt=system_prompt, seed=seed, context=context)
