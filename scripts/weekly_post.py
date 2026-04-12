@@ -380,7 +380,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--gemini-model",
-        default=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"),
+        default=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash-latest"),
         help="Modelo Gemini (padrão via GEMINI_MODEL)",
     )
     parser.add_argument(
