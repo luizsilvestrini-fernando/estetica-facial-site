@@ -239,6 +239,7 @@ def call_gemini(api_key: str, model: str, system_prompt: str, seed: dict, *, con
         "gemini-1.5-flash", 
         "gemini-1.5-flash-002",
         "gemini-1.5-flash-001",
+        "gemini-1.5-flash-8b",
         "gemini-1.5-flash-latest",
         "gemini-1.5-pro", 
         "gemini-1.5-pro-002",
@@ -449,7 +450,7 @@ def main() -> int:
 
     provider_order = [p.strip().lower() for p in args.ai_provider_order.split(",") if p.strip()]
     result = None
-    last_error = None
+    all_errors = []
 
     for provider in provider_order:
         if provider == "openai" and openai_key:
@@ -457,28 +458,29 @@ def main() -> int:
                 result = call_openai(api_key=openai_key, model=args.model, system_prompt=system_prompt, seed=seed, context=context)
                 break
             except Exception as e:
-                last_error = str(e)
+                all_errors.append(f"OpenAI: {e}")
         if provider == "anthropic" and anthropic_key:
             try:
                 result = call_anthropic(api_key=anthropic_key, model=args.anthropic_model, system_prompt=system_prompt, seed=seed, context=context)
                 break
             except Exception as e:
-                last_error = str(e)
+                all_errors.append(f"Anthropic: {e}")
         if provider == "gemini" and gemini_key:
             try:
-                result = call_gemini(api_key=gemini_key, default_model=args.gemini_model, system_prompt=system_prompt, seed=seed, context=context)
+                result = call_gemini(api_key=gemini_key, model=args.gemini_model, system_prompt=system_prompt, seed=seed, context=context)
                 break
             except Exception as e:
-                last_error = str(e)
+                all_errors.append(f"Gemini: {e}")
         if provider == "deepseek" and deepseek_key:
             try:
                 result = call_deepseek(api_key=deepseek_key, model=args.deepseek_model, system_prompt=system_prompt, seed=seed, context=context)
                 break
             except Exception as e:
-                last_error = str(e)
+                all_errors.append(f"DeepSeek: {e}")
 
     if result is None:
-        raise RuntimeError(f"Nenhum provedor de IA respondeu com sucesso. Falha: {last_error}")
+        err_sum = "\n".join(all_errors)
+        raise RuntimeError(f"Nenhum provedor de IA respondeu com sucesso.\nErros detalhados:\n{err_sum}")
 
     result = ensure_fields(result)
 
