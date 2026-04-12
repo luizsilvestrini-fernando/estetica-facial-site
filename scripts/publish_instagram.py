@@ -113,15 +113,36 @@ def make_video(image_path: str, transcript: str, out_path: str):
     main_img_clip = ImageClip(image_path).set_duration(audio_clip.duration)
     main_img_clip = main_img_clip.set_audio(audio_clip)
 
-    # 3. Clip do letreiro final (Endcard)
+    # 3. Clip do letreiro final (Endcard) com silêncio para manter a trilha de áudio
     endcard_path = str(tmp_dir / "endcard.jpg")
     generate_endcard_image(endcard_path)
-    endcard_clip = ImageClip(endcard_path).set_duration(3.5) # Tela final com logo fica 3,5 seg
+    
+    # Criamos um clip silencioso para o endcard
+    from moviepy.audio.AudioClip import AudioArrayClip
+    import numpy as np
+    silence_duration = 3.5
+    # Gerar silêncio (stereo, 44100Hz)
+    silence_data = np.zeros((int(44100 * silence_duration), 2))
+    silence_audio = AudioArrayClip(silence_data, fps=44100)
+    
+    endcard_clip = ImageClip(endcard_path).set_duration(silence_duration)
+    endcard_clip = endcard_clip.set_audio(silence_audio)
 
     # 4. Concatenar e renderizar
     final_clip = concatenate_videoclips([main_img_clip, endcard_clip], method="compose")
     print("⏳ Renderizando arquivo MP4...")
-    final_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac")
+    final_clip.write_videofile(out_path, fps=24, codec="libx264", audio_codec="aac", temp_audiofile=str(tmp_dir/"temp-audio.m4a"), remove_temp=True)
+    
+    # 5. Cleanup
+    try:
+        main_img_clip.close()
+        endcard_clip.close()
+        audio_clip.close()
+        silence_audio.close()
+        final_clip.close()
+    except:
+        pass
+
     print(f"✅ Vídeo gerado em {out_path}")
 
 
@@ -210,10 +231,11 @@ def main() -> int:
                 print(f"❌ Falha no login do Instagram: {login_err}", file=sys.stderr)
                 return 1
 
-        print("\n📤 Publicando no feed do Instagram...")
+        print("\n📤 Publicando no Instagram (REELS)...")
+        time.sleep(5) # Pequeno fôlego para o FS
         try:
             if is_video:
-                media = cl.video_upload(path=media_path, caption=full_caption)
+                media = cl.reels_upload(path=media_path, caption=full_caption)
             else:
                 media = cl.photo_upload(path=media_path, caption=full_caption)
                 
