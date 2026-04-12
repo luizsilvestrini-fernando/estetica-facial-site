@@ -105,8 +105,36 @@ def make_video(image_path: str, transcript: str, out_path: str):
     audio_path = str(tmp_dir / "tts_audio.mp3")
     print(f"🎵 Gerando áudio TTS com texto: '{transcript[:50]}...'")
     
+    elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if openai_key:
+    
+    if elevenlabs_key:
+        print("   Usando ElevenLabs TTS (voz ultra-realista)...")
+        try:
+            # Voice ID "Rachel" (famosa voz feminina em inglês/português fluente)
+            voice_id = "21m00Tcm4TlvDq8ikWAM"
+            url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+            headers = {
+                "xi-api-key": elevenlabs_key,
+                "Content-Type": "application/json"
+            }
+            data = {
+                "text": transcript,
+                "model_id": "eleven_multilingual_v2",
+                "voice_settings": {
+                    "stability": 0.5,
+                    "similarity_boost": 0.75
+                }
+            }
+            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as response:
+                with open(audio_path, 'wb') as f:
+                    f.write(response.read())
+        except Exception as e:
+            print(f"   ⚠️ Erro no ElevenLabs TTS: {e}. Tentando OpenAI TTS...")
+            elevenlabs_key = None # Força fallback para OpenAI
+
+    if not elevenlabs_key and openai_key:
         print("   Usando OpenAI TTS (voz realista)...")
         try:
             url = "https://api.openai.com/v1/audio/speech"
@@ -125,11 +153,10 @@ def make_video(image_path: str, transcript: str, out_path: str):
                     f.write(response.read())
         except Exception as e:
             print(f"   ⚠️ Erro no OpenAI TTS: {e}. Fazendo fallback para gTTS...")
-            from gtts import gTTS
-            tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
-            tts.save(audio_path)
-    else:
-        print("   ⚠️ OPENAI_API_KEY não encontrada, usando gTTS (voz robótica)...")
+            openai_key = None
+
+    if not elevenlabs_key and not openai_key:
+        print("   ⚠️ Sem chaves de IA (ou erro nelas), usando gTTS (voz robótica)...")
         try:
             from gtts import gTTS
             tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
