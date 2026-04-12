@@ -32,14 +32,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ]; then
+          if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ] && [ -z "$DEEPSEEK_API_KEY" ]; then
             echo "Missing AI secrets." >&2
             exit 1
           fi
           QUERY="${{ github.event.inputs.query }}"
           if [ -z "$QUERY" ]; then QUERY="auto"; fi
-          python -u scripts/daily_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini" --query "$QUERY"
+          python -u scripts/daily_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini,deepseek" --query "$QUERY"
 
       - name: Create pull request
         id: cpr

@@ -157,13 +157,22 @@ def call_openai(api_key: str, model: str, system_prompt: str, seed: dict, *, con
 def call_anthropic(api_key: str, model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
     url = "https://api.anthropic.com/v1/messages"
     payload = {
-        "model": model, "max_tokens": 1500, "temperature": 0.7,
+        "model": model,
+        "max_tokens": 1024,
         "system": system_prompt,
         "messages": [{"role": "user", "content": json.dumps(seed, ensure_ascii=False)}],
+        "temperature": 0.7,
     }
     data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
-        url, data=data, headers={"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}, method="POST"
+        url,
+        data=data,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST"
     )
     try:
         with urllib.request.urlopen(req, timeout=60, context=context) as res:
@@ -171,9 +180,37 @@ def call_anthropic(api_key: str, model: str, system_prompt: str, seed: dict, *, 
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Anthropic falhou: {e.read().decode('utf-8')[:200]}")
     parsed = json.loads(body)
-    parts = parsed.get("content") or []
-    text = "".join([p.get("text", "") for p in parts]).strip()
-    # clean markdown json
+    content_list = parsed.get("content") or []
+    text = content_list[0].get("text", "") if content_list else ""
+    if "```json" in text:
+        text = text.split("```json")[-1].split("```")[0].strip()
+    elif "```" in text:
+        text = text.split("```")[-1].split("```")[0].strip()
+    if "{" in text and "}" in text:
+        text = text[text.find("{"):text.rfind("}")+1]
+    return json.loads(text)
+
+def call_deepseek(api_key: str, model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
+    url = "https://api.deepseek.com/chat/completions"
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": json.dumps(seed, ensure_ascii=False)}
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.7
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=60, context=context) as res:
+            body = res.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"DeepSeek falhou: {e.read().decode('utf-8')[:200]}")
+    parsed = json.loads(body)
+    choices = parsed.get("choices") or []
+    text = (choices[0].get("message") or {}).get("content", "").strip() if choices else ""
     if "{" in text and "}" in text:
         text = text[text.find("{"):text.rfind("}")+1]
     return json.loads(text)
@@ -196,9 +233,9 @@ def get_available_gemini_models(api_key: str, context: ssl.SSLContext) -> list[s
         print(f"Aviso interno: Falha ao listar modelos do Gemini: {e}")
         return []
 
-def call_gemini(api_key: str, default_model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
+def call_gemini(api_key: str, model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
     models_to_try = [
-        default_model, 
+        model, 
         "gemini-1.5-flash", 
         "gemini-1.5-flash-002",
         "gemini-1.5-flash-001",
@@ -364,17 +401,19 @@ def main() -> int:
     parser.add_argument("--model", default=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
     parser.add_argument("--anthropic-model", default=os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"))
     parser.add_argument("--gemini-model", default=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"))
+    parser.add_argument("--deepseek-model", default=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"))
     parser.add_argument("--insecure-ssl", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--require-any-ai", action="store_true")
     parser.add_argument("--fallback-to-draft-on-all-fail", action="store_true")
     parser.add_argument("--fallback-on-openai-error", action="store_true")
-    parser.add_argument("--ai-provider-order", default="openai,anthropic,gemini")
+    parser.add_argument("--ai-provider-order", default="openai,anthropic,gemini,deepseek")
     args = parser.parse_args()
 
     openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     gemini_key = os.environ.get("GOOGLE_API_KEY", "").strip()
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
 
     context = ssl_context(args.insecure_ssl)
 
@@ -427,7 +466,13 @@ def main() -> int:
                 last_error = str(e)
         if provider == "gemini" and gemini_key:
             try:
-                result = call_gemini(api_key=gemini_key, model=args.gemini_model, system_prompt=system_prompt, seed=seed, context=context)
+                result = call_gemini(api_key=gemini_key, default_model=args.gemini_model, system_prompt=system_prompt, seed=seed, context=context)
+                break
+            except Exception as e:
+                last_error = str(e)
+        if provider == "deepseek" and deepseek_key:
+            try:
+                result = call_deepseek(api_key=deepseek_key, model=args.deepseek_model, system_prompt=system_prompt, seed=seed, context=context)
                 break
             except Exception as e:
                 last_error = str(e)
