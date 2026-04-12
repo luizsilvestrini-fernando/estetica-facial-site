@@ -50,6 +50,8 @@ jobs:
         env:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           POST_JSON_PATH: ${{ steps.find-post.outputs.post_path }}
         run: |
           if [ -z "$IG_USERNAME" ] || [ -z "$IG_PASSWORD" ]; then
@@ -68,8 +70,20 @@ jobs:
           LIVE_URL: ${{ steps.pub.outputs.ig_url }}
         run: |
           if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
-            MSG="🎉 Seu post foi publicado com sucesso no Instagram!%0AConfira ao vivo:%0A${LIVE_URL}"
-            curl -s -X GET "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${MSG}"
+            python -c "
+          import os, urllib.request, urllib.parse
+          token = os.environ.get('TELEGRAM_BOT_TOKEN')
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+          live_url = os.environ.get('LIVE_URL')
+          text = f'🎉 Seu post foi publicado com sucesso no Instagram!\nConfira ao vivo:\n{live_url}'
+          url = f'https://api.telegram.org/bot{token}/sendMessage'
+          data = urllib.parse.urlencode({'chat_id': chat_id, 'text': text}).encode('utf-8')
+          try:
+              urllib.request.urlopen(urllib.request.Request(url, data=data))
+              print('Notificação enviada com sucesso!')
+          except Exception as e:
+              print('Falha ao enviar notificação:', e)
+          "
           fi
 
       - name: Notify on failure
