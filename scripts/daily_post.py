@@ -499,7 +499,73 @@ def main() -> int:
 
     if result is None:
         err_sum = "\n".join(all_errors)
-        raise RuntimeError(f"Nenhum provedor de IA respondeu com sucesso.\nErros detalhados:\n{err_sum}")
+        if args.fallback_to_draft_on_all_fail:
+            print(f"⚠️ Todos os provedores de IA falharam.\nErros: {err_sum}\n\n👉 Usando post de fallback (Banco de Posts Padrão do Site).")
+            import random
+            fallback_posts = [
+                {
+                    "source_title": "Conheça a Dra. Bruna Silvestrini",
+                    "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
+                    "caption": "A beleza verdadeira é aquela que reflete a sua essência. Aqui na clínica Dra. Bruna Silvestrini, nosso propósito é realçar seus traços com naturalidade, segurança e um cuidado totalmente personalizado. Nossa estrutura foi pensada para proporcionar conforto e excelência em cada detalhe do seu atendimento.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+                    "hashtags": ["#DraBrunaSilvestrini", "#QuemSomos", "#EsteticaFacial", "#HarmonizacaoFacial", "#Autoestima", "#BelezaNatural", "#ClinicaEsteticaSP", "#Skincare", "#Autocuidado", "#BemEstar"],
+                    "image_prompt": "Fotografia hiper-realista de uma médica dermatologista sorrindo de jaleco branco, em uma clínica de estética premium muito bem iluminada, tons claros e champagne, 85mm, 4k",
+                    "alt_text": "Dra. Bruna Silvestrini sorrindo em sua clínica de estética.",
+                    "posting_suggestion": "Postar no Feed às 18h",
+                    "story_idea": "Mostre um pouco dos bastidores da clínica e convide as pessoas para uma avaliação.",
+                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+                    "is_video": False,
+                    "video_script": ""
+                },
+                {
+                    "source_title": "Nossos Procedimentos",
+                    "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+                    "caption": "Você sabia que a harmonização facial vai muito além de preenchimentos? Ela envolve um planejamento cuidadoso para equilibrar proporções, suavizar linhas de expressão e devolver o viço da sua pele. Trabalhamos com Toxina Botulínica, Fios de Sustentação, Bioestimuladores e muito mais, sempre priorizando resultados elegantes e sutis.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+                    "hashtags": ["#DraBrunaSilvestrini", "#ProcedimentosEsteticos", "#ToxinaBotulinica", "#PreenchimentoFacial", "#Bioestimuladores", "#EsteticaAvancada", "#Rejuvenescimento", "#Beleza", "#SaudeDaPele"],
+                    "image_prompt": "Fotografia hiper-realista de um rosto feminino com pele perfeita, natural e iluminada, sendo examinada delicadamente por mãos com luvas de procedimento brancas, ambiente clínico de luxo, 85mm, 4k",
+                    "alt_text": "Paciente recebendo cuidados estéticos no rosto.",
+                    "posting_suggestion": "Postar no Feed às 12h",
+                    "story_idea": "Abra uma caixinha de perguntas sobre os procedimentos que a clínica oferece.",
+                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+                    "is_video": False,
+                    "video_script": ""
+                },
+                {
+                    "source_title": "Depoimentos de Pacientes",
+                    "source_url": "https://drabrunasilvestrini.com.br/#depoimentos",
+                    "caption": "A maior recompensa do nosso trabalho é ver o sorriso e a confiança renovada de cada paciente que passa por aqui. Cada rosto conta uma história, e nós amamos fazer parte dessa transformação de forma leve e natural. Obrigada por confiarem em nossas mãos!\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+                    "hashtags": ["#DraBrunaSilvestrini", "#Depoimentos", "#PacientesFelizes", "#AutoestimaElevada", "#ResultadosNaturais", "#EsteticaPremium", "#HarmonizacaoComAmor", "#SorrisoRenovado"],
+                    "image_prompt": "Fotografia hiper-realista de uma mulher linda e confiante, sorrindo genuinamente em um ambiente sofisticado, pele natural, iluminação cinematográfica suave, 85mm, 4k",
+                    "alt_text": "Mulher sorrindo com a pele radiante após o tratamento.",
+                    "posting_suggestion": "Postar no Feed às 19h",
+                    "story_idea": "Compartilhe o print de um feedback positivo (apagando o nome) nos Stories.",
+                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+                    "is_video": False,
+                    "video_script": ""
+                },
+                {
+                    "source_title": "Bem-vindo à Clínica",
+                    "source_url": "https://drabrunasilvestrini.com.br/#home",
+                    "caption": "Cuidar de si mesma não é um luxo, é um ato de amor próprio. Na Clínica Dra. Bruna Silvestrini, acreditamos que a estética avançada deve caminhar lado a lado com a sua saúde e bem-estar. Venha viver uma experiência única de cuidado, onde você é o centro das atenções.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+                    "hashtags": ["#DraBrunaSilvestrini", "#EsteticaFacial", "#AmorProprio", "#ClinicaDeEstetica", "#HarmonizacaoSP", "#CuidadosComAPele", "#Rejuvenescimento", "#PelePerfeita"],
+                    "image_prompt": "Fotografia hiper-realista do interior de uma clínica de estética de alto padrão, poltrona de atendimento confortável, tons pastéis e dourados, flores sutis, luz natural entrando pela janela, 4k",
+                    "alt_text": "Ambiente aconchegante e sofisticado da clínica Dra. Bruna Silvestrini.",
+                    "posting_suggestion": "Postar no Feed às 09h",
+                    "story_idea": "Faça um tour rápido mostrando a recepção ou a sala de atendimento.",
+                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+                    "is_video": False,
+                    "video_script": ""
+                }
+            ]
+            
+            result = random.choice(fallback_posts)
+            
+            # Se o tema de hoje pedir vídeo, a gente adapta o fallback escolhido
+            if weekday_theme["name"] == "Mitos e Verdades - VÍDEO (Domingo)":
+                result["is_video"] = True
+                result["video_script"] = f"Olá! Eu sou a Dra. Bruna Silvestrini. {result['caption'].split('📲')[0].replace('Aqui na clínica', 'Aqui na nossa clínica').replace('Na Clínica Dra.', 'Na nossa clínica')}"
+                result["caption"] = "Assista ao vídeo e saiba mais sobre nosso cuidado especial!\n\n" + result["caption"]
+        else:
+            raise RuntimeError(f"Nenhum provedor de IA respondeu com sucesso.\nErros detalhados:\n{err_sum}")
 
     result = ensure_fields(result)
 
