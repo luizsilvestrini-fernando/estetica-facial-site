@@ -178,42 +178,94 @@ def call_anthropic(api_key: str, model: str, system_prompt: str, seed: dict, *, 
         text = text[text.find("{"):text.rfind("}")+1]
     return json.loads(text)
 
-def call_gemini(api_key: str, model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
-    models_to_try = [model, "gemini-1.5-flash-latest", "gemini-1.5-flash", "gemini-pro"]
+def get_available_gemini_models(api_key: str, context: ssl.SSLContext) -> list[str]:
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={urllib.parse.quote(api_key)}"
+    req = urllib.request.Request(url, headers={"content-type": "application/json"}, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=context) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            models = data.get("models", [])
+            valid_models = []
+            for m in models:
+                name = m.get("name", "").replace("models/", "")
+                methods = m.get("supportedGenerationMethods", [])
+                if "gemini" in name.lower() and "generateContent" in methods:
+                    valid_models.append(name)
+            return valid_models
+    except Exception as e:
+        print(f"Aviso interno: Falha ao listar modelos do Gemini: {e}")
+        return []
+
+def call_gemini(api_key: str, default_model: str, system_prompt: str, seed: dict, *, context: ssl.SSLContext) -> dict:
+    models_to_try = [
+        default_model, 
+        "gemini-1.5-flash", 
+        "gemini-1.5-flash-002",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro", 
+        "gemini-1.5-pro-002",
+        "gemini-1.5-pro-001",
+        "gemini-1.0-pro",
+        "gemini-pro"
+    ]
+    
+    available = get_available_gemini_models(api_key, context)
+    if available:
+        print(f"🔍 Discovered Gemini models: {', '.join(available[:5])}...")
+        models_to_try = available + models_to_try
+    else:
+        print("⚠️ Failed to dynamic list models. Relying on extensive defaults.")
+
     last_error = ""
 
+    seen = set()
+    unique_models = []
     for m in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(api_key)}"
-        payload = {
-            "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + json.dumps(seed, ensure_ascii=False)}]}],
-            "generationConfig": {"temperature": 0.7},
-        }
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers={"content-type": "application/json"}, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=60, context=context) as res:
-                body = res.read().decode("utf-8")
-                parsed = json.loads(body)
-                candidates = parsed.get("candidates") or []
-                content = ((candidates[0] or {}).get("content") or {}) if candidates else {}
-                parts = content.get("parts") or []
-                text = "".join([p.get("text", "") for p in parts]).strip()
-                if text.startswith("```"):
-                   text = re.sub(r"^```[a-zA-Z]*\n", "", text)
-                   text = re.sub(r"\n```$", "", text)
-                   text = text.strip()
-                return json.loads(text)
-        except urllib.error.HTTPError as e:
-            err_msg = e.read().decode("utf-8")[:200]
-            last_error = err_msg
-            print(f"Aviso interno: Falha ao usar {m}: {err_msg}")
-            if "not found" in err_msg.lower():
-                continue # Tenta o proximo modelo da lista
-            raise RuntimeError(f"Gemini falhou inesperadamente em {m}: {err_msg}")
-        except Exception as ex:
-             raise RuntimeError(f"Falha generica no comando Gemini: {ex}")
+        if m and m not in seen:
+            seen.add(m)
+            unique_models.append(m)
+
+    api_versions = ["v1beta", "v1"]
+
+    for version in api_versions:
+        for m in unique_models:
+            url = f"https://generativelanguage.googleapis.com/{version}/models/{urllib.parse.quote(m)}:generateContent?key={urllib.parse.quote(api_key)}"
+            payload = {
+                "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + json.dumps(seed, ensure_ascii=False)}]}],
+                "generationConfig": {"temperature": 0.7},
+            }
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=data, headers={"content-type": "application/json"}, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=60, context=context) as res:
+                    body = res.read().decode("utf-8")
+                    parsed = json.loads(body)
+                    candidates = parsed.get("candidates") or []
+                    content = ((candidates[0] or {}).get("content") or {}) if candidates else {}
+                    parts = content.get("parts") or []
+                    text = "".join([p.get("text", "") for p in parts]).strip()
+                    if text.startswith("```"):
+                       text = re.sub(r"^```[a-zA-Z]*\n", "", text)
+                       text = re.sub(r"\n```$", "", text)
+                       text = text.strip()
+                    
+                    try:
+                        return json.loads(text)
+                    except Exception as json_err:
+                        raise RuntimeError(f"O modelo {m} na API {version} não retornou JSON válido.")
+            except urllib.error.HTTPError as e:
+                err_msg = e.read().decode("utf-8")[:200]
+                last_error = err_msg
+                print(f"Aviso interno: Falha ao usar {m} ({version}): {err_msg}")
+                if "not found" in err_msg.lower() or "not supported" in err_msg.lower() or "Method not found" in err_msg:
+                    continue # Tenta o proximo modelo/versao
+                raise RuntimeError(f"Gemini falhou inesperadamente em {m} ({version}): {err_msg}")
+            except Exception as ex:
+                 print(f"Falha ao conectar usando {m} ({version}): {ex}")
+                 continue
              
-    raise RuntimeError(f"Todos os modelos do Gemini falharam! Último erro: {last_error}")
+    raise RuntimeError(f"Todos os modelos do Gemini falharam em v1 e v1beta! Último erro testado: {last_error}")
 
 def ensure_fields(obj: dict) -> dict:
     required = [
