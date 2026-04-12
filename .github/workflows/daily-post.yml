@@ -59,7 +59,7 @@ jobs:
             content/daily-posts/*.json
 
       - name: Send Telegram Notification
-        if: steps.cpr.outputs.pull-request-url != ''
+        if: always() && steps.cpr.outputs.pull-request-number != ''
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

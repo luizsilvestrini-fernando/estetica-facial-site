@@ -2,6 +2,10 @@ name: Publish Instagram Post
 
 # Dispara quando um PR da automação diária é mergeado na main
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'content/daily-posts/*.json'
   pull_request:
     types: [closed]
     branches: [main]
