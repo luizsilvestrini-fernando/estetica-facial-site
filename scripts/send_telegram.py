@@ -35,15 +35,18 @@ def send_telegram():
          data = {"chat_id": chat_id, "text": f"Novo rascunho criado, mas JSON não encontrado! Link: {pr_url}"}
     else:
          caption = post.get("caption", "...")
+         # Escape HTML basic tags if needed, but for telegram usually simple is better
+         caption_html = caption.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
          hashtags = " ".join(post.get("hashtags", []))
-         msg = f"📝 **Novo Rascunho Gerado!**\n\n{caption}\n\n{hashtags}\n\n"
+         
+         msg = f"<b>📝 Novo Rascunho Gerado!</b>\n\n{caption_html}\n\n<i>{hashtags}</i>\n\n"
          
          if post.get("is_video"):
-             msg += "🎬 *Atenção: Este é um roteiro de VÍDEO. A imagem de fundo é enviada acima, mas a música e locução serão geradas apenas quando for pro Instagram.*\n"
-             msg += f"🎙️ *Locução:* {post.get('video_script','')}\n\n"
+             msg += "🎬 <b>Atenção: Este é um roteiro de VÍDEO.</b> A imagem de fundo é enviada acima, mas a música e locução serão geradas apenas quando for pro Instagram.\n"
+             msg += f"🎙️ <b>Locução:</b> {post.get('video_script','')}\n\n"
 
-         msg += f"👉 Para aprovar e postar agora, responda: **OK**\n"
-         msg += f"Ou veja o código completo aqui: {pr_url}"
+         msg += f"👉 Para aprovar e postar agora, responda: <b>OK</b>\n"
+         msg += f"Ou veja o código completo aqui: <a href='{pr_url}'>GitHub PR</a>"
 
          img_url = build_image_url(post.get("image_prompt", ""))
          
@@ -52,7 +55,7 @@ def send_telegram():
              "chat_id": chat_id,
              "photo": img_url,
              "caption": msg,
-             "parse_mode": "Markdown"
+             "parse_mode": "HTML"
          }
 
     req = urllib.request.Request(
