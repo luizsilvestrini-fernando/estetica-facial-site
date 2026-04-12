@@ -121,12 +121,13 @@ def fetch_google_news_first(query: str, *, context: ssl.SSLContext) -> dict:
 def build_system_message(weekday_theme: dict) -> str:
     base = (
         "Você é um redator de conteúdo para clínica premium de harmonização facial (Dra. Bruna Silvestrini). "
-        "Responda SOMENTE em JSON válido (sem markdown, sem triple backticks). Use português (pt-BR). "
+        "Responda SOMENTE em JSON válido (sem markdown, sem triple backticks). Use exclusivamente português (pt-BR). "
+        "PROIBIDO: Não utilize nenhuma palavra em inglês nos campos 'caption', 'alt_text', 'video_script' ou 'source_title'. "
         "OBRIGATÓRIO: a legenda (caption) DEVE terminar com uma chamada para ação direcionando ao WhatsApp, "
         "usando o formato: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. "
         "Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer, is_video, video_script."
     )
-    theme_instructions = f"\n\nINSTRUÇÕES DO TEMA DE HOJE:\n{weekday_theme['instructions']}"
+    theme_instructions = f"\n\nINSTRUÇÕES DO TEMA DE HOJE (EM PORTUGUÊS):\n{weekday_theme['instructions']}"
     return base + theme_instructions
 
 

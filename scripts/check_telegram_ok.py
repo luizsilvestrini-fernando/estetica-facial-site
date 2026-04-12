@@ -54,21 +54,27 @@ def check_for_ok():
             prs = json.loads(output)
             
             if not prs:
-                print("Nenhum PR de automação aberto encontrado para merge.")
+                print("Nenhum PR de automação aberto encontrado para merge com a label 'automation'.")
+            else:
+                print(f"Encontrados {len(prs)} PR(s) para processar.")
             
             for pr in prs:
                 pr_num = str(pr['number'])
-                print(f"Fazendo merge do PR #{pr_num}...")
+                print(f"Tentando realizar o merge do PR #{pr_num}...")
                 merge_cmd = ["gh", "pr", "merge", pr_num, "--squash", "--delete-branch", "--admin"]
-                subprocess.run(merge_cmd, check=False)
+                proc = subprocess.run(merge_cmd, capture_output=True, text=True)
                 
-                # Feedback pro usuário
-                fb_url = f"https://api.telegram.org/bot{token}/sendMessage"
-                fb_data = {"chat_id": chat_id_target, "text": f"✅ O robô obedeceu seu comando e começou a publicar o post! Sairá no Feed em instantes."}
-                urllib.request.urlopen(urllib.request.Request(fb_url, data=json.dumps(fb_data).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST"))
+                if proc.returncode == 0:
+                    print(f"✅ Merge do PR #{pr_num} realizado com sucesso!")
+                    # Feedback pro usuário
+                    fb_url = f"https://api.telegram.org/bot{token}/sendMessage"
+                    fb_data = {"chat_id": chat_id_target, "text": f"✅ O robô obedeceu seu comando e começou a publicar o post! Sairá no Feed em instantes."}
+                    urllib.request.urlopen(urllib.request.Request(fb_url, data=json.dumps(fb_data).encode("utf-8"), headers={"Content-Type": "application/json"}, method="POST"))
+                else:
+                    print(f"❌ Falha ao mergiar PR #{pr_num}: {proc.stderr}")
                 
         except Exception as e:
-            print(f"Erro ao tentar aprovar automaticamente: {e}")
+            print(f"Erro crítico ao tentar aprovar automaticamente: {e}")
             
     # Marcar as mensagens como lidas
     if highest_update_id > 0:

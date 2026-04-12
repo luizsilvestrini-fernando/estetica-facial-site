@@ -3,7 +3,10 @@ import json
 import os
 import urllib.request
 import urllib.parse
+import ssl
 from pathlib import Path
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 def get_latest_post_json() -> dict:
     d = Path("content/daily-posts")
