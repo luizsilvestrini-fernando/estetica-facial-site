@@ -95,18 +95,47 @@ def make_video(image_path: str, transcript: str, out_path: str):
     """Cria o clipe mp4 juntando TTS, imagem e letreiro no final."""
     print("🎬 Iniciando processamento de VÍDEO...")
     try:
-        from gtts import gTTS
         from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
     except ImportError:
-        raise RuntimeError("Dependências 'gTTS' ou 'moviepy' não instaladas. Rode pip install gTTS moviepy.")
+        raise RuntimeError("Dependências 'moviepy' não instaladas. Rode pip install moviepy.")
 
     tmp_dir = Path(image_path).parent
 
     # 1. Gerar TTS
     audio_path = str(tmp_dir / "tts_audio.mp3")
     print(f"🎵 Gerando áudio TTS com texto: '{transcript[:50]}...'")
-    tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
-    tts.save(audio_path)
+    
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if openai_key:
+        print("   Usando OpenAI TTS (voz realista)...")
+        try:
+            url = "https://api.openai.com/v1/audio/speech"
+            headers = {
+                "Authorization": f"Bearer {openai_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": "tts-1",
+                "input": transcript,
+                "voice": "nova"
+            }
+            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=60, context=ssl_context()) as response:
+                with open(audio_path, 'wb') as f:
+                    f.write(response.read())
+        except Exception as e:
+            print(f"   ⚠️ Erro no OpenAI TTS: {e}. Fazendo fallback para gTTS...")
+            from gtts import gTTS
+            tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
+            tts.save(audio_path)
+    else:
+        print("   ⚠️ OPENAI_API_KEY não encontrada, usando gTTS (voz robótica)...")
+        try:
+            from gtts import gTTS
+            tts = gTTS(text=transcript, lang='pt', tld='com.br', slow=False)
+            tts.save(audio_path)
+        except ImportError:
+            raise RuntimeError("Dependência 'gTTS' não instalada para o fallback.")
 
     # 2. Clips principais
     audio_clip = AudioFileClip(audio_path)

@@ -125,6 +125,7 @@ def build_system_message(weekday_theme: dict) -> str:
         "PROIBIDO: Não utilize nenhuma palavra em inglês nos campos 'caption', 'alt_text', 'video_script' ou 'source_title'. "
         "OBRIGATÓRIO: a legenda (caption) DEVE terminar com uma chamada para ação direcionando ao WhatsApp, "
         "usando o formato: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. "
+        "MUITO IMPORTANTE PARA A IMAGEM: O campo 'image_prompt' DEVE descrever SEMPRE uma FOTOGRAFIA HIPER-REALISTA de UMA PESSOA (ex: paciente sorrindo, médica(o) atendendo, rosto feminino com pele natural). NUNCA descreva ilustrações, letreiros, textos ou logotipos. Foque em pessoas reais, iluminação fotográfica suave, lente 85mm e ambiente de clínica de estética de alto padrão. "
         "Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer, is_video, video_script."
     )
     theme_instructions = f"\n\nINSTRUÇÕES DO TEMA DE HOJE (EM PORTUGUÊS):\n{weekday_theme['instructions']}"
