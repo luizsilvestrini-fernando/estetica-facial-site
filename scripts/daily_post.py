@@ -338,59 +338,45 @@ def get_theme_for_today() -> dict:
     if weekday == 0:  # Segunda
         theme["name"] = "Antes e Depois - Procedimentos de Segunda"
         theme["instructions"] = (
-            "Faça um post narrando um caso de 'Antes e Depois' (uma transformação) de botox ou preenchimento facial. "
-            "Para o 'image_prompt', crie um cenário mostrando uma mulher sorrindo logo após o procedimento na clínica (foco no resultado lindo). "
-            "A imagem não será dividida, mas sim um resultado de excelência."
+            "Faça um post focado em 'Antes e Depois' (transformação) usando toxina botulínica ou preenchimento labial, com foco na naturalidade. "
+            "Para o 'image_prompt', descreva uma cena HIPER-REALISTA de uma paciente mulher muito feliz e sorridente com a pele impecável, sentada em uma clínica de estética de luxo. "
+            "A imagem NÃO DEVE CONTER nenhuma montagem de 'antes e depois', NENHUM TEXTO ESCRITO, apenas o retrato de excelência da paciente feliz com a pele."
         )
     elif weekday == 1: # Terça
-        theme["name"] = "Notícias e Estudos (Terça)"
+        theme["name"] = "Ciência da Beleza e Atualizações (Terça)"
         theme["instructions"] = (
-            "Este é o post de ciência e novidades. Baseado na notícia fornecida na seed, extraia um insight útil e simplificado para leigos sobre estética e saúde e faça um post atrativo."
+            "Faça um post educativo sobre as atualizações nos tratamentos de estética facial. Mostre como a Dra. Bruna utiliza ciência para garantir segurança. "
+            "O 'image_prompt' deve ser uma fotografia de uma médica dermatologista examinando produtos premium ou a pele de uma paciente em um ambiente bem iluminado."
         )
     elif weekday == 2: # Quarta
-        theme["name"] = "Curiosidades sobre a Pele e Rosto (Quarta)"
+        theme["name"] = "Curiosidades sobre Colágeno e Prevenção (Quarta)"
         theme["instructions"] = (
-            "Elabore uma curiosidade super interessante sobre colágeno, envelhecimento, lábios ou saúde facial."
+            "Elabore uma curiosidade super interessante sobre produção de colágeno, bioestimuladores ou prevenção do envelhecimento. "
+            "Para o 'image_prompt', descreva uma fotografia macro hiper-realista da pele perfeita de um rosto feminino, transmitindo a ideia de hidratação profunda. NUNCA coloque letreiros."
         )
     elif weekday == 3: # Quinta
-        holiday_today = False
-        holiday_name = ""
-        if holidays:
-            br_holidays = holidays.BR()
-            if today in br_holidays:
-                holiday_today = True
-                holiday_name = br_holidays.get(today)
-                
-        if holiday_today:
-            theme["name"] = f"Promocional de Feriado: {holiday_name} (Quinta)"
-            theme["instructions"] = (
-                f"Hoje é feriado de {holiday_name}. Você deve criar uma promoção temática imperdível! "
-                "OBRIGATÓRIO: A legenda deve conter EXATAMENTE a frase: 'Consulte já nossos preços promocionais! 25% em todos os procedimentos para os 10 primeiros que fecharem'. "
-                "Crie uma imagem temática do feriado focada em estética com letreiros chamativos."
-            )
-        else:
-            theme["name"] = "Ofertas Inteligentes e Site (Quinta)"
-            theme["instructions"] = (
-                "Post com foco comercial. Mencione e convide o usuário a conhecer mais sobre nossos procedimentos principais visitando o site https://drabrunasilvestrini.com.br. "
-                "Fale de um procedimento como Fios ou Ácido Hialurônico e crie urgência de agenda."
-            )
-    elif weekday == 4: # Sexta
-        theme["name"] = "Cuidados e Skincare (Sexta)"
+        theme["name"] = "Tratamentos Exclusivos e Agendamento (Quinta)"
         theme["instructions"] = (
-            "Gere conteúdo sobre Home Care (cuidados em casa): o que usar antes ou depois dos procedimentos. Dicas de produtos (ex: protetor solar, vitamina c, hyaluronidense)."
-            "Para a imagem, sugira uma cena de 'skincare routine' luxuosa com a modelo aplicando creme no rosto."
+            "Post com foco comercial elegante. Convide o usuário a conhecer a experiência exclusiva de cuidado na clínica. Fale de Harmonização Full Face. "
+            "Para o 'image_prompt', descreva uma fotografia arquitetônica deslumbrante do interior de um consultório de estética luxuoso e acolhedor (sem pessoas ou textos)."
+        )
+    elif weekday == 4: # Sexta
+        theme["name"] = "Cuidados em Casa e Skincare (Sexta)"
+        theme["instructions"] = (
+            "Gere conteúdo sobre Home Care (cuidados em casa): a importância de limpar a pele, hidratar e usar protetor solar para prolongar a harmonização. "
+            "Para o 'image_prompt', descreva uma fotografia hiper-realista de uma mulher aplicando delicadamente um creme no rosto em um banheiro luxuoso de spa."
         )
     elif weekday == 5: # Sábado
-        theme["name"] = "Antes e Depois - Procedimentos Avançados (Sábado)"
+        theme["name"] = "Resultados Avançados e Autoestima (Sábado)"
         theme["instructions"] = (
-            "Outro caso de transformação de autoestima ('Antes e Depois' narrado). Desta vez, foque em Fios de Sustentação ou bioestimuladores e como eles promovem lifting sem cirurgia."
+            "Faça um post narrando como os fios de sustentação ou bioestimuladores devolvem o contorno e promovem efeito lifting, elevando a autoestima. "
+            "O 'image_prompt' deve descrever uma mulher madura, super elegante e sorridente em um evento social, com a pele incrivelmente firme e bem tratada."
         )
     elif weekday == 6: # Domingo
         theme["name"] = "Mitos e Verdades (Domingo)"
         theme["instructions"] = (
-            "Gere um post abordando 'Mitos e Verdades' sobre harmonização facial. "
-            "A 'caption' deve ser a legenda que vai no feed do Instagram, sendo amigável, educativa e desmistificando informações falsas. "
-            "O 'image_prompt' deve gerar uma imagem fotográfica de alta qualidade ilustrando o cuidado ou um resultado sutil."
+            "Gere um post abordando um 'Mito ou Verdade' sobre harmonização facial (ex: 'Deixa o rosto artificial? Mito!'). Explique que o foco da Dra. Bruna é a sutileza. "
+            "O 'image_prompt' deve ser uma foto hiper-realista da médica sorrindo no consultório, transmitindo total confiança e empatia. Zero texto na imagem."
         )
     
     return theme
