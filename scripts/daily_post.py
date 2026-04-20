@@ -120,13 +120,18 @@ def fetch_google_news_first(query: str, *, context: ssl.SSLContext) -> dict:
 
 def build_system_message(weekday_theme: dict) -> str:
     base = (
-        "Você é um redator de conteúdo para clínica premium de harmonização facial (Dra. Bruna Silvestrini). "
-        "Responda SOMENTE em JSON válido (sem markdown, sem triple backticks). Use exclusivamente português (pt-BR). "
+        "Você é o social media da clínica premium Dra. Bruna Silvestrini. "
+        "O cliente NÃO QUER mais posts genéricos. Você DEVE basear seu texto EXATAMENTE no conteúdo oficial do site e NUNCA inventar informações. "
+        "Responda SOMENTE em JSON válido. Use exclusivamente português (pt-BR). "
         "PROIBIDO: Não utilize nenhuma palavra em inglês nos campos 'caption', 'alt_text', 'video_script' ou 'source_title'. "
-        "OBRIGATÓRIO: a legenda (caption) DEVE terminar com uma chamada para ação direcionando ao WhatsApp, "
-        "usando o formato: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. "
-        "MUITO IMPORTANTE PARA A IMAGEM: O campo 'image_prompt' DEVE descrever SEMPRE uma FOTOGRAFIA HIPER-REALISTA de UMA PESSOA (ex: paciente sorrindo, médica(o) atendendo, rosto feminino com pele natural). NUNCA descreva ilustrações, letreiros, textos ou logotipos. Foque em pessoas reais, iluminação fotográfica suave, lente 85mm e ambiente de clínica de estética de alto padrão. "
-        "Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, alt_text, posting_suggestion, story_idea, disclaimer, is_video, video_script."
+        "OBRIGATÓRIO: a legenda (caption) DEVE terminar com: '\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!'. "
+        "MUITO IMPORTANTE PARA A IMAGEM: O cliente não quer mais imagens geradas por IA genérica. Você DEVE deixar o campo 'image_prompt' VAZIO (\"\") e PREENCHER o campo 'image_url' com uma destas opções do site oficial:\n"
+        "- https://drabrunasilvestrini.com.br/assets/doctor_profile_updated_full_head.png (Para posts sobre a Dra Bruna, Mitos e Verdades, ou Quem Somos)\n"
+        "- https://drabrunasilvestrini.com.br/assets/botox1.jpeg (Para posts sobre Toxina Botulínica, Rugas ou Prevenção)\n"
+        "- https://drabrunasilvestrini.com.br/assets/preenchimento1.jpeg (Para posts sobre Preenchimento Labial ou Hidratação)\n"
+        "- https://drabrunasilvestrini.com.br/assets/harmonizacao_full_face.png (Para posts sobre Harmonização Full Face, Sustentação ou Resultados)\n"
+        "- https://drabrunasilvestrini.com.br/assets/hero_modern_interactive_face_1770921982241.png (Para posts institucionais, cuidados com a pele, ciência ou estética geral)\n"
+        "Campos obrigatórios: source_title, source_url, caption, hashtags, image_prompt, image_url, alt_text, posting_suggestion, story_idea, disclaimer, is_video, video_script."
     )
     theme_instructions = f"\n\nINSTRUÇÕES DO TEMA DE HOJE (EM PORTUGUÊS):\n{weekday_theme['instructions']}"
     return base + theme_instructions
@@ -310,7 +315,7 @@ def call_gemini(api_key: str, model: str, system_prompt: str, seed: dict, *, con
 def ensure_fields(obj: dict) -> dict:
     required = [
         "source_title", "source_url", "caption", "hashtags", "image_prompt",
-        "alt_text", "posting_suggestion", "story_idea", "disclaimer"
+        "image_url", "alt_text", "posting_suggestion", "story_idea", "disclaimer"
     ]
     for k in required:
         if k not in obj:
@@ -502,7 +507,7 @@ def main() -> int:
             
             # Fallbacks usando IMAGENS REAIS do site (https://drabrunasilvestrini.com.br/assets/...)
             # A variável 'image_url' forçará o script de publicação a baixar essa imagem invés de gerar uma nova.
-            fallback_posts = [
+            fallback_posts: list[dict] = [
                 {
                     "source_title": "Conheça a Dra. Bruna Silvestrini",
                     "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
@@ -597,7 +602,10 @@ def main() -> int:
         md_content += f"> {result['video_script']}\n\n"
     md_content += f"## Legenda\n{result['caption']}\n\n"
     md_content += f"## Hashtags\n{' '.join(['#'+h if not h.startswith('#') else h for h in result['hashtags']])}\n\n"
-    md_content += f"## Imagem Prompt\n{result['image_prompt']}\n\n"
+    if result.get("image_prompt"):
+        md_content += f"## Imagem Prompt\n{result['image_prompt']}\n\n"
+    if result.get("image_url"):
+        md_content += f"## Imagem Oficial do Site\n{result['image_url']}\n\n"
     
     out_file_md = out_dir / f"{today}.md"
     out_file_md.write_text(md_content, encoding="utf-8")
