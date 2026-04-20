@@ -389,204 +389,94 @@ def get_theme_for_today() -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--query", default="harmonização facial benefícios")
     parser.add_argument("--out-dir", default="content/daily-posts")
-    parser.add_argument("--model", default=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"))
-    parser.add_argument("--anthropic-model", default=os.environ.get("ANTHROPIC_MODEL", "claude-3-5-haiku-20241022"))
-    parser.add_argument("--gemini-model", default=os.environ.get("GEMINI_MODEL", "gemini-1.5-flash"))
-    parser.add_argument("--deepseek-model", default=os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"))
-    parser.add_argument("--insecure-ssl", action="store_true")
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--require-any-ai", action="store_true")
-    parser.add_argument("--fallback-to-draft-on-all-fail", action="store_true")
-    parser.add_argument("--fallback-on-openai-error", action="store_true")
-    parser.add_argument("--ai-provider-order", default="openai,anthropic,gemini,deepseek")
-    parser.add_argument("--mock-botox", action="store_true", help="Forçar tema de botox")
+    parser.add_argument("--mock-botox", action="store_true", help="Force a test post about Botox")
+    parser.add_argument("--require-any-ai", action="store_true", help="Obsolete. IA is now disabled.")
+    parser.add_argument("--fallback-to-draft-on-all-fail", action="store_true", help="Fallback to draft on fail")
+    parser.add_argument("--fallback-on-openai-error", action="store_true", help="Try others if OpenAI fails")
+    parser.add_argument("--ai-provider-order", type=str, default="", help="Obsolete. IA is now disabled.")
+    parser.add_argument("--query", type=str, default="")
     args = parser.parse_args()
 
-    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    anthropic_key_fallback = os.environ.get("ANTHROPIC_API_KEY_FALLBACK", "").strip()
-    gemini_key = os.environ.get("GOOGLE_API_KEY", "").strip()
-    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
-
-    context = ssl_context(args.insecure_ssl)
-
-    weekday_theme = get_theme_for_today()
-    if args.mock_botox:
-        weekday_theme["name"] = "Antes e Depois - Procedimentos de Segunda (Mock)"
-        weekday_theme["instructions"] = (
-            "Faça um post narrando um caso de 'Antes e Depois' (uma transformação) de botox ou preenchimento facial. "
-            "Para o 'image_prompt', crie um cenário mostrando uma mulher sorrindo logo após o procedimento na clínica (foco no resultado lindo). "
-            "A imagem não será dividida, mas sim um resultado de excelência."
-        )
-
-    print(f"🗓️ Tema do dia: {weekday_theme['name']}")
-
-    import random
-    insights = [
-        "Destaque a naturalidade e leveza",
-        "Foque na segurança e experiência clínica",
-        "Use um tom acolhedor e inspirador",
-        "Mencione o cuidado individualizado",
-        "Seja direto, elegante e focado em autoestima",
-        "Traga um tom de luxo acessível e bem-estar"
-    ]
-
-    seed = {
-        "topic": "estética e harmonização facial",
-        "brand": {
-            "name": "Dra. Bruna Silvestrini",
-            "tone": "premium e empático",
-            "cta": "Agende pelo WhatsApp (11) 99550-5765",
-            "daily_insight": random.choice(insights)
+    # Como solicitado: Apenas gerar os posts do banco padrão do site. Nada de IA.
+    print("⚠️  Modo estrito ativado: O uso de IA (OpenAI, Gemini, etc) foi DESATIVADO.")
+    print("👉 Gerando post OBRIGATORIAMENTE através do Banco Oficial do Site.")
+    
+    fallback_posts: list[dict] = [
+        {
+            "source_title": "Conheça a Dra. Bruna Silvestrini",
+            "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
+            "caption": "A clínica é um espaço pensado nos mínimos detalhes, dedicado exclusivamente a realçar a sua beleza natural através de tratamentos estéticos de excelência. 💖\n\nComo especialista reconhecida em procedimentos faciais injetáveis, uno a ciência à arte para entregar resultados que rejuvenescem e valorizam seus traços únicos. Nossa missão não é transformar quem você é, mas resgatar o seu brilho e devolver a juventude com total naturalidade, segurança e equilíbrio.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+            "hashtags": ["#DraBrunaSilvestrini", "#QuemSomos", "#HarmonizacaoFacial", "#BelezaNatural", "#ClinicaEsteticaSP", "#OdontologiaEstetica"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/doctor_profile_updated_full_head.png",
+            "alt_text": "Dra. Bruna Silvestrini",
+            "posting_suggestion": "Postar no Feed às 18h",
+            "story_idea": "Mostre os bastidores da clínica.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
         },
-        "theme_of_today": weekday_theme["name"],
-        "nonce": random.randint(1, 999999) # Força o LLM a não repetir o texto anterior em cache
-    }
-
-    # Só buscar notícias/XML se o tema de hoje pedir (ex: Terça, onde o tema é notícias e precisamos do seed do pubmed)
-    if dt.date.today().weekday() == 1:
-        try:
-            item = fetch_pubmed_latest(args.query, context=context)
-        except Exception:
-            try:
-                item = fetch_google_news_first(args.query, context=context)
-            except Exception:
-                item = {"title": "Avanços na harmonização", "link": "https://drabrunasilvestrini.com.br", "description": ""}
-        seed["article"] = item
-
-    if args.dry_run and not openai_key:
-        print("Dry-run sem execução de APIs por falta de key. Fechando.")
-        return 0
-
-    system_prompt = build_system_message(weekday_theme)
-
-    provider_order = [p.strip().lower() for p in args.ai_provider_order.split(",") if p.strip()]
-    result = None
-    all_errors = []
-
-    for provider in provider_order:
-        if provider == "openai" and openai_key:
-            try:
-                result = call_openai(api_key=openai_key, model=args.model, system_prompt=system_prompt, seed=seed, context=context)
-                break
-            except Exception as e:
-                all_errors.append(f"OpenAI: {e}")
-        if provider == "anthropic":
-            a_keys = [anthropic_key, anthropic_key_fallback]
-            a_keys = [k for k in a_keys if k]
-            a_success = False
-            for k in a_keys:
-                try:
-                    result = call_anthropic(api_key=k, model=args.anthropic_model, system_prompt=system_prompt, seed=seed, context=context)
-                    a_success = True
-                    break
-                except Exception as e:
-                    all_errors.append(f"Anthropic (Chave terminada em {k[-4:]}): {e}")
-            if a_success:
-                break
-        if provider == "gemini" and gemini_key:
-            try:
-                result = call_gemini(api_key=gemini_key, model=args.gemini_model, system_prompt=system_prompt, seed=seed, context=context)
-                break
-            except Exception as e:
-                all_errors.append(f"Gemini: {e}")
-        if provider == "deepseek" and deepseek_key:
-            try:
-                result = call_deepseek(api_key=deepseek_key, model=args.deepseek_model, system_prompt=system_prompt, seed=seed, context=context)
-                break
-            except Exception as e:
-                all_errors.append(f"DeepSeek: {e}")
-
-    if result is None:
-        err_sum = "\n".join(all_errors)
-        if args.fallback_to_draft_on_all_fail:
-            print(f"⚠️ Todos os provedores de IA falharam.\nErros: {err_sum}\n\n👉 Usando post de fallback (Banco de Posts Padrão do Site).")
-            weekday = dt.date.today().weekday()
-            
-            # Fallbacks usando IMAGENS REAIS do site (https://drabrunasilvestrini.com.br/assets/...)
-            # A variável 'image_url' forçará o script de publicação a baixar essa imagem invés de gerar uma nova.
-            fallback_posts: list[dict] = [
-                {
-                    "source_title": "Conheça a Dra. Bruna Silvestrini",
-                    "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
-                    "caption": "A clínica é um espaço pensado nos mínimos detalhes, dedicado exclusivamente a realçar a sua beleza natural através de tratamentos estéticos de excelência. 💖\n\nComo especialista reconhecida em procedimentos faciais injetáveis, uno a ciência à arte para entregar resultados que rejuvenescem e valorizam seus traços únicos. Nossa missão não é transformar quem você é, mas resgatar o seu brilho e devolver a juventude com total naturalidade, segurança e equilíbrio.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
-                    "hashtags": ["#DraBrunaSilvestrini", "#QuemSomos", "#HarmonizacaoFacial", "#BelezaNatural", "#ClinicaEsteticaSP", "#OdontologiaEstetica"],
-                    "image_prompt": "",
-                    "image_url": "https://drabrunasilvestrini.com.br/assets/doctor_profile_updated_full_head.png",
-                    "alt_text": "Dra. Bruna Silvestrini",
-                    "posting_suggestion": "Postar no Feed às 18h",
-                    "story_idea": "Mostre os bastidores da clínica.",
-                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
-                    "is_video": False,
-                    "video_script": ""
-                },
-                {
-                    "source_title": "Toxina Botulínica",
-                    "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
-                    "caption": "A famosa 'fórmula da juventude'! ✨\n\nA Toxina Botulínica é essencial para relaxar a musculatura, suavizar linhas de expressão e rugas, e prevenir os sinais do envelhecimento precoce. Uma prevenção inteligente que garante arqueamento de sobrancelhas e um rosto mais descansado, mantendo a naturalidade.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
-                    "hashtags": ["#DraBrunaSilvestrini", "#ToxinaBotulinica", "#Botox", "#Prevenção", "#RejuvenescimentoFacial", "#PeleLisa"],
-                    "image_prompt": "",
-                    "image_url": "https://drabrunasilvestrini.com.br/assets/botox1.jpeg",
-                    "alt_text": "Aplicação de Toxina Botulínica",
-                    "posting_suggestion": "Postar no Feed às 12h",
-                    "story_idea": "Mostre como é rápido o procedimento de toxina.",
-                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
-                    "is_video": False,
-                    "video_script": ""
-                },
-                {
-                    "source_title": "Preenchimento Labial",
-                    "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
-                    "caption": "Lábios desenhados sob medida para você! 👄\n\nUtilizamos ácido hialurônico para hidratar, projetar e corrigir assimetrias, entregando um volume apaixonante e super natural. Garanta um contorno definido, hidratação profunda (Gloss Lips) e a proporção perfeita que seu rosto merece.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
-                    "hashtags": ["#DraBrunaSilvestrini", "#PreenchimentoLabial", "#LabiosPerfeitos", "#GlossLips", "#AcidoHialuronico", "#HarmonizacaoFacial"],
-                    "image_prompt": "",
-                    "image_url": "https://drabrunasilvestrini.com.br/assets/preenchimento1.jpeg",
-                    "alt_text": "Procedimento de Preenchimento Labial",
-                    "posting_suggestion": "Postar no Feed às 19h",
-                    "story_idea": "Compartilhe um antes e depois imediato de preenchimento labial.",
-                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
-                    "is_video": False,
-                    "video_script": ""
-                },
-                {
-                    "source_title": "Harmonização Full Face",
-                    "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
-                    "caption": "Um tratamento completo para devolver a luz ao seu rosto! 🌟\n\nA Harmonização Full Face inclui preenchimento de olheiras profundas, correção do bigode chinês e sustentação mandibular. O resultado? Uma aparência descansada, sustentação dos tecidos e uma harmonia facial global incrível.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
-                    "hashtags": ["#DraBrunaSilvestrini", "#HarmonizacaoFullFace", "#PreenchimentoDeOlheiras", "#SustentacaoFacial", "#BelezaNatural", "#Autoestima"],
-                    "image_prompt": "",
-                    "image_url": "https://drabrunasilvestrini.com.br/assets/harmonizacao_full_face.png",
-                    "alt_text": "Resultados de Harmonização Full Face",
-                    "posting_suggestion": "Postar no Feed às 18h",
-                    "story_idea": "Explique a importância da avaliação global do rosto.",
-                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
-                    "is_video": False,
-                    "video_script": ""
-                },
-                {
-                    "source_title": "Por que nossa clínica é a escolha ideal?",
-                    "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
-                    "caption": "Por que escolher a nossa clínica para o seu cuidado facial? 💎\n\n✔️ Excelência: Compromisso com resultados impecáveis.\n✔️ Segurança: Protocolos rigorosos e a melhor tecnologia do mercado.\n✔️ Inovação: Técnicas modernas e produtos premium de última geração.\n✔️ Exclusividade: Tratamentos 100% personalizados com mapeamento individualizado do seu rosto.\n\nVenha viver essa experiência!\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
-                    "hashtags": ["#DraBrunaSilvestrini", "#ClinicaEsteticaSP", "#EsteticaPremium", "#Seguranca", "#InovacaoNaEstetica", "#AtendimentoExclusivo"],
-                    "image_prompt": "",
-                    "image_url": "https://drabrunasilvestrini.com.br/assets/hero_modern_interactive_face_1770921982241.png",
-                    "alt_text": "Rosto interativo e moderno representando tecnologia e exclusividade",
-                    "posting_suggestion": "Postar no Feed às 12h",
-                    "story_idea": "Mostre os produtos premium que você utiliza.",
-                    "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
-                    "is_video": False,
-                    "video_script": ""
-                }
-            ]
-            
-            # Escolhe um post de fallback aleatório da lista oficial do site
-            import random
-            result = random.choice(fallback_posts)
-
-        else:
-            raise RuntimeError(f"Nenhum provedor de IA respondeu com sucesso.\nErros detalhados:\n{err_sum}")
-
+        {
+            "source_title": "Toxina Botulínica",
+            "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+            "caption": "A famosa 'fórmula da juventude'! ✨\n\nA Toxina Botulínica é essencial para relaxar a musculatura, suavizar linhas de expressão e rugas, e prevenir os sinais do envelhecimento precoce. Uma prevenção inteligente que garante arqueamento de sobrancelhas e um rosto mais descansado, mantendo a naturalidade.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+            "hashtags": ["#DraBrunaSilvestrini", "#ToxinaBotulinica", "#Botox", "#Prevenção", "#RejuvenescimentoFacial", "#PeleLisa"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/botox1.jpeg",
+            "alt_text": "Aplicação de Toxina Botulínica",
+            "posting_suggestion": "Postar no Feed às 12h",
+            "story_idea": "Mostre como é rápido o procedimento de toxina.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        },
+        {
+            "source_title": "Preenchimento Labial",
+            "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+            "caption": "Lábios desenhados sob medida para você! 👄\n\nUtilizamos ácido hialurônico para hidratar, projetar e corrigir assimetrias, entregando um volume apaixonante e super natural. Garanta um contorno definido, hidratação profunda (Gloss Lips) e a proporção perfeita que seu rosto merece.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+            "hashtags": ["#DraBrunaSilvestrini", "#PreenchimentoLabial", "#LabiosPerfeitos", "#GlossLips", "#AcidoHialuronico", "#HarmonizacaoFacial"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/preenchimento1.jpeg",
+            "alt_text": "Procedimento de Preenchimento Labial",
+            "posting_suggestion": "Postar no Feed às 19h",
+            "story_idea": "Compartilhe um antes e depois imediato de preenchimento labial.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        },
+        {
+            "source_title": "Harmonização Full Face",
+            "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+            "caption": "Um tratamento completo para devolver a luz ao seu rosto! 🌟\n\nA Harmonização Full Face inclui preenchimento de olheiras profundas, correção do bigode chinês e sustentação mandibular. O resultado? Uma aparência descansada, sustentação dos tecidos e uma harmonia facial global incrível.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+            "hashtags": ["#DraBrunaSilvestrini", "#HarmonizacaoFullFace", "#PreenchimentoDeOlheiras", "#SustentacaoFacial", "#BelezaNatural", "#Autoestima"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/harmonizacao_full_face.png",
+            "alt_text": "Resultados de Harmonização Full Face",
+            "posting_suggestion": "Postar no Feed às 18h",
+            "story_idea": "Explique a importância da avaliação global do rosto.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        },
+        {
+            "source_title": "Por que nossa clínica é a escolha ideal?",
+            "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
+            "caption": "Por que escolher a nossa clínica para o seu cuidado facial? 💎\n\n✔️ Excelência: Compromisso com resultados impecáveis.\n✔️ Segurança: Protocolos rigorosos e a melhor tecnologia do mercado.\n✔️ Inovação: Técnicas modernas e produtos premium de última geração.\n✔️ Exclusividade: Tratamentos 100% personalizados com mapeamento individualizado do seu rosto.\n\nVenha viver essa experiência!\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
+            "hashtags": ["#DraBrunaSilvestrini", "#ClinicaEsteticaSP", "#EsteticaPremium", "#Seguranca", "#InovacaoNaEstetica", "#AtendimentoExclusivo"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/hero_modern_interactive_face_1770921982241.png",
+            "alt_text": "Rosto interativo e moderno representando tecnologia e exclusividade",
+            "posting_suggestion": "Postar no Feed às 12h",
+            "story_idea": "Mostre os produtos premium que você utiliza.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        }
+    ]
+    
+    import random
+    result = random.choice(fallback_posts)
     result = ensure_fields(result)
 
     today = dt.date.today().isoformat()
@@ -595,7 +485,7 @@ def main() -> int:
     
     # Gerar markdown bonitinho para o PR
     md_content = f"# Post Diário — {today}\n\n"
-    md_content += f"**Tema do dia:** {weekday_theme['name']}\n\n"
+    md_content += f"**Post retirado oficialmente do Site da Clínica.**\n\n"
     if result["is_video"]:
         md_content += "🎬 **VÍDEO DETECTADO** (Este post será publicado como Reels)\n\n"
         md_content += "### Roteiro de Áudio (Locução)\n"
