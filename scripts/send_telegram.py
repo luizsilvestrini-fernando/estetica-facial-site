@@ -57,7 +57,9 @@ def send_telegram():
     full_msg += f"👉 Para aprovar e postar agora, responda: <b>OK</b>\n"
     full_msg += f"Ou veja o código completo aqui: <a href='{pr_url}'>GitHub PR</a>"
 
-    img_url = build_image_url(post.get("image_prompt", ""))
+    img_url = post.get("image_url")
+    if not img_url:
+        img_url = build_image_url(post.get("image_prompt", ""))
     
     # Telegram sendPhoto tem limite de 1024 chars no caption.
     # Se estourar, enviamos a foto com o título e o texto completo numa mensagem separada.
