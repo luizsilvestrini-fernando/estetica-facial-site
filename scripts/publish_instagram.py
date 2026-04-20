@@ -40,8 +40,47 @@ def download_image(url: str, dest: Path) -> Path:
 
 
 def build_image_url(prompt: str) -> str:
-    encoded = urllib.parse.quote(prompt, safe="")
-    return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true"
+    import random
+    # Reforça as regras no prompt para evitar ilustrações e textos
+    enhanced_prompt = prompt + ", photorealistic, 85mm lens, high quality, professional photography, no text, no watermark, no illustrations"
+    encoded = urllib.parse.quote(enhanced_prompt, safe="")
+    # Adiciona um seed aleatório para não gerar a mesma imagem sempre
+    seed = random.randint(1, 999999)
+    return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&seed={seed}"
+
+
+def generate_image_nanobanana(prompt: str, api_key: str, dest: Path) -> Path:
+    """Gera a imagem usando a API Nano Banana (Gemini 2.5 Flash Image) se a chave estiver configurada."""
+    print("🍌 Usando Nano Banana API para gerar a imagem...")
+    # Reforça regras anti-texto e ilustrações
+    enhanced_prompt = prompt + ", photorealistic, high quality, no text, no watermark"
+    url = "https://api.nano-banana.run/v1/generate"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "prompt": enhanced_prompt,
+        "model": "nano-banana-v1"
+    }
+    
+    req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120, context=ssl_context()) as res:
+            data = json.loads(res.read().decode("utf-8"))
+            if "image_url" in data:
+                return download_image(data["image_url"], dest)
+            elif "image" in data:
+                # Base64
+                import base64
+                img_data = base64.b64decode(data["image"])
+                dest.write_bytes(img_data)
+                return dest
+            else:
+                raise ValueError("Resposta inesperada da Nano Banana API")
+    except Exception as e:
+        print(f"⚠️ Erro no Nano Banana: {e}. Fazendo fallback para Pollinations...")
+        raise e
 
 
 def generate_endcard_image(out_path: str):
@@ -234,9 +273,8 @@ def main() -> int:
     video_script = post_data.get("video_script", "")
 
     if not image_url:
-        print("🎨 Gerando imagem de fundo a partir do prompt...")
-        image_url = build_image_url(image_prompt)
-
+        print("🎨 Gerando imagem a partir do prompt...")
+        
     hashtag_str = " ".join([h if h.startswith("#") else f"#{h}" for h in hashtags])
     full_caption = caption.strip()
     if hashtag_str:
@@ -246,11 +284,26 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory() as tmpdir:
         img_path = Path(tmpdir) / "post_image.jpg"
-        print("⬇️ Baixando imagem...")
+        
+        nanobanana_key = os.environ.get("NANOBANANA_API_KEY")
+        
         try:
-            download_image(image_url, img_path)
+            if not image_url:
+                if nanobanana_key:
+                    try:
+                        generate_image_nanobanana(image_prompt, nanobanana_key, img_path)
+                    except Exception:
+                        print("Fazendo fallback para Pollinations...")
+                        image_url = build_image_url(image_prompt)
+                        download_image(image_url, img_path)
+                else:
+                    image_url = build_image_url(image_prompt)
+                    download_image(image_url, img_path)
+            else:
+                print("⬇️ Baixando imagem da URL fornecida...")
+                download_image(image_url, img_path)
         except Exception as e:
-            print(f"❌ Falha ao baixar imagem: {e}", file=sys.stderr)
+            print(f"❌ Falha ao baixar ou gerar imagem: {e}", file=sys.stderr)
             return 1
             
         media_path = img_path

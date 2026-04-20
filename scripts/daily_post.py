@@ -386,12 +386,11 @@ def get_theme_for_today() -> dict:
             "Outro caso de transformação de autoestima ('Antes e Depois' narrado). Desta vez, foque em Fios de Sustentação ou bioestimuladores e como eles promovem lifting sem cirurgia."
         )
     elif weekday == 6: # Domingo
-        theme["name"] = "Mitos e Verdades - VÍDEO (Domingo)"
+        theme["name"] = "Mitos e Verdades (Domingo)"
         theme["instructions"] = (
-            "Gere o script para um VÍDEO de 'Mitos e Verdades' sobre harmonização. OBRIGATÓRIO RETORNAR json com is_video = true e video_script preenchido. "
-            "No 'video_script' coloque SOMENTE o texto que será lido em voz alta pela IA (seja amigável e educativa). "
-            "A 'caption' deve ser a legenda que vai no feed do Instagram instigando assistir o vídeo. "
-            "O 'image_prompt' deve gerar a imagem estática de fundo para o vídeo com uma vibe de estética."
+            "Gere um post abordando 'Mitos e Verdades' sobre harmonização facial. "
+            "A 'caption' deve ser a legenda que vai no feed do Instagram, sendo amigável, educativa e desmistificando informações falsas. "
+            "O 'image_prompt' deve gerar uma imagem fotográfica de alta qualidade ilustrando o cuidado ou um resultado sutil."
         )
     
     return theme
@@ -433,14 +432,26 @@ def main() -> int:
 
     print(f"🗓️ Tema do dia: {weekday_theme['name']}")
 
+    import random
+    insights = [
+        "Destaque a naturalidade e leveza",
+        "Foque na segurança e experiência clínica",
+        "Use um tom acolhedor e inspirador",
+        "Mencione o cuidado individualizado",
+        "Seja direto, elegante e focado em autoestima",
+        "Traga um tom de luxo acessível e bem-estar"
+    ]
+
     seed = {
         "topic": "estética e harmonização facial",
         "brand": {
             "name": "Dra. Bruna Silvestrini",
             "tone": "premium e empático",
             "cta": "Agende pelo WhatsApp (11) 99550-5765",
+            "daily_insight": random.choice(insights)
         },
-        "theme_of_today": weekday_theme["name"]
+        "theme_of_today": weekday_theme["name"],
+        "nonce": random.randint(1, 999999) # Força o LLM a não repetir o texto anterior em cache
     }
 
     # Só buscar notícias/XML se o tema de hoje pedir (ex: Terça, onde o tema é notícias e precisamos do seed do pubmed)
@@ -558,12 +569,6 @@ def main() -> int:
             ]
             
             result = random.choice(fallback_posts)
-            
-            # Se o tema de hoje pedir vídeo, a gente adapta o fallback escolhido
-            if weekday_theme["name"] == "Mitos e Verdades - VÍDEO (Domingo)":
-                result["is_video"] = True
-                result["video_script"] = f"Olá! Eu sou a Dra. Bruna Silvestrini. {result['caption'].split('📲')[0].replace('Aqui na clínica', 'Aqui na nossa clínica').replace('Na Clínica Dra.', 'Na nossa clínica')}"
-                result["caption"] = "Assista ao vídeo e saiba mais sobre nosso cuidado especial!\n\n" + result["caption"]
         else:
             raise RuntimeError(f"Nenhum provedor de IA respondeu com sucesso.\nErros detalhados:\n{err_sum}")
 

@@ -52,6 +52,7 @@ jobs:
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          NANOBANANA_API_KEY: ${{ secrets.NANOBANANA_API_KEY }}
           POST_JSON_PATH: ${{ steps.find-post.outputs.post_path }}
         run: |
           if [ -z "$IG_USERNAME" ] || [ -z "$IG_PASSWORD" ]; then
