@@ -41,12 +41,11 @@ def download_image(url: str, dest: Path) -> Path:
 
 def build_image_url(prompt: str) -> str:
     import random
-    # Reforça as regras no prompt para evitar ilustrações e textos
-    enhanced_prompt = prompt + ", photorealistic, 85mm lens, high quality, professional photography, no text, no watermark, no illustrations"
+    # Forçar explicitamente a não usar arte genérica e focar na Dra. Bruna/Estética.
+    enhanced_prompt = "A high-end hyper-realistic photograph. " + prompt + ". DSLR, 85mm lens, sharp focus, natural lighting, extremely detailed, professional photography, absolutely no text, no watermark, no illustrations, no cartoons, no 3D renders."
     encoded = urllib.parse.quote(enhanced_prompt, safe="")
-    # Adiciona um seed aleatório para não gerar a mesma imagem sempre
-    seed = random.randint(1, 999999)
-    return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&seed={seed}"
+    seed = random.randint(1, 9999999)
+    return f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&nologo=true&seed={seed}&enhance=false"
 
 
 def generate_image_nanobanana(prompt: str, api_key: str, dest: Path) -> Path:
