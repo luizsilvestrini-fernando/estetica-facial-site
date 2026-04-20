@@ -520,12 +520,7 @@ def main() -> int:
                 {
                     "source_title": "Conheça a Dra. Bruna Silvestrini",
                     "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
-                    "caption": "A clínica é um espaço pensado nos mínimos detalhes, dedicado exclusivamente a realçar a sua beleza natural através de tratamentos estéticos de excelência. 💖
-
-Como especialista reconhecida em procedimentos faciais injetáveis, uno a ciência à arte para entregar resultados que rejuvenescem e valorizam seus traços únicos. Nossa missão não é transformar quem você é, mas resgatar o seu brilho e devolver a juventude com total naturalidade, segurança e equilíbrio.
-
-📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765
-Ou clique no link da bio!",
+                    "caption": "A clínica é um espaço pensado nos mínimos detalhes, dedicado exclusivamente a realçar a sua beleza natural através de tratamentos estéticos de excelência. 💖\n\nComo especialista reconhecida em procedimentos faciais injetáveis, uno a ciência à arte para entregar resultados que rejuvenescem e valorizam seus traços únicos. Nossa missão não é transformar quem você é, mas resgatar o seu brilho e devolver a juventude com total naturalidade, segurança e equilíbrio.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
                     "hashtags": ["#DraBrunaSilvestrini", "#QuemSomos", "#HarmonizacaoFacial", "#BelezaNatural", "#ClinicaEsteticaSP", "#OdontologiaEstetica"],
                     "image_prompt": "",
                     "image_url": "https://drabrunasilvestrini.com.br/assets/doctor_profile_updated_full_head.png",
@@ -539,12 +534,7 @@ Ou clique no link da bio!",
                 {
                     "source_title": "Toxina Botulínica",
                     "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
-                    "caption": "A famosa 'fórmula da juventude'! ✨
-
-A Toxina Botulínica é essencial para relaxar a musculatura, suavizar linhas de expressão e rugas, e prevenir os sinais do envelhecimento precoce. Uma prevenção inteligente que garante arqueamento de sobrancelhas e um rosto mais descansado, mantendo a naturalidade.
-
-📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765
-Ou clique no link da bio!",
+                    "caption": "A famosa 'fórmula da juventude'! ✨\n\nA Toxina Botulínica é essencial para relaxar a musculatura, suavizar linhas de expressão e rugas, e prevenir os sinais do envelhecimento precoce. Uma prevenção inteligente que garante arqueamento de sobrancelhas e um rosto mais descansado, mantendo a naturalidade.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
                     "hashtags": ["#DraBrunaSilvestrini", "#ToxinaBotulinica", "#Botox", "#Prevenção", "#RejuvenescimentoFacial", "#PeleLisa"],
                     "image_prompt": "",
                     "image_url": "https://drabrunasilvestrini.com.br/assets/botox1.jpeg",
@@ -558,12 +548,7 @@ Ou clique no link da bio!",
                 {
                     "source_title": "Preenchimento Labial",
                     "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
-                    "caption": "Lábios desenhados sob medida para você! 👄
-
-Utilizamos ácido hialurônico para hidratar, projetar e corrigir assimetrias, entregando um volume apaixonante e super natural. Garanta um contorno definido, hidratação profunda (Gloss Lips) e a proporção perfeita que seu rosto merece.
-
-📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765
-Ou clique no link da bio!",
+                    "caption": "Lábios desenhados sob medida para você! 👄\n\nUtilizamos ácido hialurônico para hidratar, projetar e corrigir assimetrias, entregando um volume apaixonante e super natural. Garanta um contorno definido, hidratação profunda (Gloss Lips) e a proporção perfeita que seu rosto merece.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
                     "hashtags": ["#DraBrunaSilvestrini", "#PreenchimentoLabial", "#LabiosPerfeitos", "#GlossLips", "#AcidoHialuronico", "#HarmonizacaoFacial"],
                     "image_prompt": "",
                     "image_url": "https://drabrunasilvestrini.com.br/assets/preenchimento1.jpeg",
@@ -577,12 +562,7 @@ Ou clique no link da bio!",
                 {
                     "source_title": "Harmonização Full Face",
                     "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
-                    "caption": "Um tratamento completo para devolver a luz ao seu rosto! 🌟
-
-A Harmonização Full Face inclui preenchimento de olheiras profundas, correção do bigode chinês e sustentação mandibular. O resultado? Uma aparência descansada, sustentação dos tecidos e uma harmonia facial global incrível.
-
-📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765
-Ou clique no link da bio!",
+                    "caption": "Um tratamento completo para devolver a luz ao seu rosto! 🌟\n\nA Harmonização Full Face inclui preenchimento de olheiras profundas, correção do bigode chinês e sustentação mandibular. O resultado? Uma aparência descansada, sustentação dos tecidos e uma harmonia facial global incrível.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
                     "hashtags": ["#DraBrunaSilvestrini", "#HarmonizacaoFullFace", "#PreenchimentoDeOlheiras", "#SustentacaoFacial", "#BelezaNatural", "#Autoestima"],
                     "image_prompt": "",
                     "image_url": "https://drabrunasilvestrini.com.br/assets/harmonizacao_full_face.png",
@@ -596,17 +576,7 @@ Ou clique no link da bio!",
                 {
                     "source_title": "Por que nossa clínica é a escolha ideal?",
                     "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
-                    "caption": "Por que escolher a nossa clínica para o seu cuidado facial? 💎
-
-✔️ Excelência: Compromisso com resultados impecáveis.
-✔️ Segurança: Protocolos rigorosos e a melhor tecnologia do mercado.
-✔️ Inovação: Técnicas modernas e produtos premium de última geração.
-✔️ Exclusividade: Tratamentos 100% personalizados com mapeamento individualizado do seu rosto.
-
-Venha viver essa experiência!
-
-📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765
-Ou clique no link da bio!",
+                    "caption": "Por que escolher a nossa clínica para o seu cuidado facial? 💎\n\n✔️ Excelência: Compromisso com resultados impecáveis.\n✔️ Segurança: Protocolos rigorosos e a melhor tecnologia do mercado.\n✔️ Inovação: Técnicas modernas e produtos premium de última geração.\n✔️ Exclusividade: Tratamentos 100% personalizados com mapeamento individualizado do seu rosto.\n\nVenha viver essa experiência!\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
                     "hashtags": ["#DraBrunaSilvestrini", "#ClinicaEsteticaSP", "#EsteticaPremium", "#Seguranca", "#InovacaoNaEstetica", "#AtendimentoExclusivo"],
                     "image_prompt": "",
                     "image_url": "https://drabrunasilvestrini.com.br/assets/hero_modern_interactive_face_1770921982241.png",
