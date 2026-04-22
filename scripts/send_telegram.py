@@ -9,7 +9,12 @@ from pathlib import Path
 ssl._create_default_https_context = ssl._create_unverified_context
 
 def get_latest_post_json() -> dict:
-    d = Path("content/daily-posts")
+    # 1. Procura na pasta de backup temporária (onde o arquivo novo sobreviveu ao reset do GitHub Actions)
+    d = Path("/tmp/daily-posts")
+    if not d.exists():
+        # 2. Se não existir no backup, procura no repositório normal
+        d = Path("content/daily-posts")
+        
     if not d.exists(): return {}
     files = sorted(d.glob("*.json"), reverse=True)
     if not files: return {}

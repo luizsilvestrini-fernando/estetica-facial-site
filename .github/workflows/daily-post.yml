@@ -57,6 +57,9 @@ jobs:
           fi
           
           "${CMD[@]}"
+          
+          # Salvar em /tmp para o Telegram conseguir ler (o create-pull-request apaga da pasta)
+          cp -r content/daily-posts /tmp/daily-posts
 
       - name: Create pull request
         id: cpr
