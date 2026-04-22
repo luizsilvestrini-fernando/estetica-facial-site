@@ -5,11 +5,15 @@ on:
     - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
+      post_index:
+        description: "ID do post para publicar (ex: 0, 1, 2) ou 'random' para sorteio"
+        required: false
+        default: "random"
       query:
-        description: "Consulta ou tema manual"
+        description: "Consulta ou tema manual (Obsoleto)"
         required: false
       mock_botox:
-        description: "Forçar tema de botox (true/false)"
+        description: "Forçar tema de botox (true/false) (Obsoleto)"
         required: false
         default: "false"
 
@@ -40,6 +44,7 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           INPUT_QUERY: ${{ github.event.inputs.query }}
           INPUT_MOCK_BOTOX: ${{ github.event.inputs.mock_botox }}
+          INPUT_POST_INDEX: ${{ github.event.inputs.post_index }}
         run: |
           if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ] && [ -z "$GOOGLE_API_KEY" ] && [ -z "$DEEPSEEK_API_KEY" ]; then
             echo "Missing AI secrets." >&2
@@ -50,7 +55,10 @@ jobs:
           QUERY="$INPUT_QUERY"
           if [ -z "$QUERY" ]; then QUERY="auto"; fi
           
-          CMD=(python -u scripts/daily_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini,deepseek" --query "$QUERY")
+          POST_IDX="$INPUT_POST_INDEX"
+          if [ -z "$POST_IDX" ]; then POST_IDX="random"; fi
+          
+          CMD=(python -u scripts/daily_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini,deepseek" --query "$QUERY" --post-index "$POST_IDX")
           
           if [ "$INPUT_MOCK_BOTOX" = "true" ]; then
             CMD+=(--mock-botox)
