@@ -404,6 +404,48 @@ def main() -> int:
     
     fallback_posts: list[dict] = [
         {
+            "source_title": "Promoção Mês das Mães - Botox Full Face",
+            "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+            "caption": "✨ ESPECIAL MÊS DAS MÃES ✨\n\nPresenteie quem mais merece com o melhor da estética facial!\n\n💉 BOTOX FULL FACE\n━━━━━━━━━━━━━━━━━\n\n✅ Suaviza rugas e linhas de expressão\n✅ Previne sinais do envelhecimento\n✅ Resultado natural e rejuvenescedor\n\n💰 De R$ 1.200,00\n🔥 POR APENAS R$ 799,00\n🏷️ Em até 4x de R$ 199,75 sem juros!\n\n⏰ Promoção válida somente em Maio!\n\n📍 Unidades: Paulista | V. Madalena | V. Mariana\n🏠 Atendimento VIP à domicílio (consulte)\n\n👩‍⚕️ Dra. Bruna Silvestrini — CRO: 150190\n\n📲 Agende agora mesmo! Clique no link da bio ou pelo WhatsApp: (11) 99550-5765\n\n_Vagas limitadas!_ 💕",
+            "hashtags": ["#DraBrunaSilvestrini", "#MesDasMaes", "#BotoxFullFace", "#PromocaoBotox", "#ClinicaEsteticaSP", "#PresenteDeMae"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/botox1.jpeg",
+            "alt_text": "Promoção de Botox Full Face Mês das Mães",
+            "posting_suggestion": "Postar no Feed às 12h",
+            "story_idea": "Mostre os resultados rápidos do Botox para o Dia das Mães.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        },
+        {
+            "source_title": "Valor Promocional - Preenchimento Labial",
+            "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+            "caption": "💋 VALOR PROMOCIONAL 💋\n\nLábios perfeitos com resultado natural e super hidratados!\n\n💉 PREENCHIMENTO LABIAL\n━━━━━━━━━━━━━━━━━━━━\n\n✅ Contorno definido e elegante\n✅ Hidratação profunda (Gloss Lips)\n✅ Volume natural e proporção perfeita\n\n💰 POR APENAS R$ 899,00\n🏷️ Em até 4x de R$ 224,75 sem juros!\n\nUtilizamos ácido hialurônico premium para entregar um resultado apaixonante e super natural.\n\n📍 Unidades: Paulista | V. Madalena | V. Mariana\n🏠 Atendimento VIP à domicílio (consulte)\n\n👩‍⚕️ Dra. Bruna Silvestrini — CRO: 150190\n\n📲 Agende sua avaliação agora! Clique no link da bio ou pelo WhatsApp: (11) 99550-5765\n\n_Agende e transforme seu sorriso!_ 💕",
+            "hashtags": ["#DraBrunaSilvestrini", "#PreenchimentoLabial", "#GlossLips", "#AcidoHialuronico", "#LabiosPerfeitos", "#PromocaoEstetica"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/preenchimento1.jpeg",
+            "alt_text": "Promoção de Preenchimento Labial",
+            "posting_suggestion": "Postar no Feed às 18h",
+            "story_idea": "Compartilhe um antes e depois imediato de preenchimento labial.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        },
+        {
+            "source_title": "Campanha - Harmonização Full Face",
+            "source_url": "https://drabrunasilvestrini.com.br/#procedimentos",
+            "caption": "🌟 HARMONIZAÇÃO FULL FACE 🌟\n\nO tratamento completo para devolver a luz ao seu rosto!\n\n💉 O QUE INCLUI:\n━━━━━━━━━━━━━━━━━\n\n✅ Preenchimento de olheiras profundas\n✅ Correção do bigode chinês\n✅ Sustentação mandibular\n✅ Harmonia facial global\n\n🪄 Resultado: aparência descansada, jovial e naturalmente linda.\n\n📍 Unidades: Paulista | V. Madalena | V. Mariana\n🏠 Atendimento VIP à domicílio (consulte)\n\n👩‍⚕️ Dra. Bruna Silvestrini — CRO: 150190\n\n📲 Solicite uma avaliação personalizada: Clique no link da bio ou pelo WhatsApp: (11) 99550-5765\n\n_Realce sua essência com excelência!_ ✨",
+            "hashtags": ["#DraBrunaSilvestrini", "#HarmonizacaoFullFace", "#EsteticaFacial", "#Rejuvenescimento", "#BelezaNatural", "#Autoestima"],
+            "image_prompt": "",
+            "image_url": "https://drabrunasilvestrini.com.br/assets/harmonizacao_full_face.png",
+            "alt_text": "Campanha Harmonização Full Face",
+            "posting_suggestion": "Postar no Feed às 19h",
+            "story_idea": "Explique a importância da avaliação global do rosto.",
+            "disclaimer": "Resultados variam. Avaliação individual é indispensável.",
+            "is_video": False,
+            "video_script": ""
+        },
+        {
             "source_title": "Conheça a Dra. Bruna Silvestrini",
             "source_url": "https://drabrunasilvestrini.com.br/#quem-somos",
             "caption": "A clínica é um espaço pensado nos mínimos detalhes, dedicado exclusivamente a realçar a sua beleza natural através de tratamentos estéticos de excelência. 💖\n\nComo especialista reconhecida em procedimentos faciais injetáveis, uno a ciência à arte para entregar resultados que rejuvenescem e valorizam seus traços únicos. Nossa missão não é transformar quem você é, mas resgatar o seu brilho e devolver a juventude com total naturalidade, segurança e equilíbrio.\n\n📲 Agende sua avaliação pelo WhatsApp: (11) 99550-5765\nOu clique no link da bio!",
