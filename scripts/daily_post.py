@@ -396,7 +396,7 @@ def main() -> int:
     parser.add_argument("--fallback-on-openai-error", action="store_true", help="Try others if OpenAI fails")
     parser.add_argument("--ai-provider-order", type=str, default="", help="Obsolete. IA is now disabled.")
     parser.add_argument("--query", type=str, default="")
-    parser.add_argument("--post-index", type=str, default="random", help="ID do post no banco (0, 1, 2...) ou 'random' para sortear")
+    parser.add_argument("--post-index", type=str, default="sequence", help="ID do post no banco (0, 1, 2...) ou 'sequence' para ordem automática semanal")
     args = parser.parse_args()
 
     # Como solicitado: Apenas gerar os posts do banco padrão do site. Nada de IA.
@@ -521,18 +521,25 @@ def main() -> int:
     import random
     
     post_idx_str = args.post_index.strip().lower()
-    if post_idx_str and post_idx_str != "random" and post_idx_str.isdigit():
+    if post_idx_str and post_idx_str not in ["random", "sequence"] and post_idx_str.isdigit():
         idx = int(post_idx_str)
         if 0 <= idx < len(fallback_posts):
             result = fallback_posts[idx]
             print(f"👉 Post selecionado MANUALMENTE via GitHub Actions: ID {idx} - {result['source_title']}")
         else:
-            print(f"⚠️ ID {idx} inválido (temos {len(fallback_posts)} posts, indo de 0 a {len(fallback_posts)-1}). Sorteando aleatoriamente...")
-            result = random.choice(fallback_posts)
-            print(f"🎲 Post sorteado ALEATORIAMENTE: {result['source_title']}")
-    else:
+            # Fallback to sequence
+            print(f"⚠️ ID {idx} inválido (temos {len(fallback_posts)} posts). Usando sequência semanal...")
+            idx = dt.date.today().isocalendar()[1] % len(fallback_posts)
+            result = fallback_posts[idx]
+            print(f"📅 Post selecionado na SEQUÊNCIA SEMANAL (Semana {dt.date.today().isocalendar()[1]}): ID {idx} - {result['source_title']}")
+    elif post_idx_str == "random":
         result = random.choice(fallback_posts)
         print(f"🎲 Post sorteado ALEATORIAMENTE: {result['source_title']}")
+    else:
+        # Default to sequence based on the week of the year
+        idx = dt.date.today().isocalendar()[1] % len(fallback_posts)
+        result = fallback_posts[idx]
+        print(f"📅 Post selecionado na SEQUÊNCIA SEMANAL (Semana {dt.date.today().isocalendar()[1]}): ID {idx} - {result['source_title']}")
         
     result = ensure_fields(result)
 

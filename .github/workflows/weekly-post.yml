@@ -1,14 +1,14 @@
-name: Daily Post Draft
+name: Weekly Post Draft
 
 on:
   schedule:
-    - cron: "0 16 * * *"
+    - cron: "0 16 * * 1"
   workflow_dispatch:
     inputs:
       post_index:
-        description: "ID do post para publicar (ex: 0, 1, 2) ou 'random' para sorteio"
+        description: "ID do post para publicar (ex: 0, 1, 2) ou 'sequence' para ordem automática"
         required: false
-        default: "random"
+        default: "sequence"
       query:
         description: "Consulta ou tema manual (Obsoleto)"
         required: false
@@ -56,7 +56,7 @@ jobs:
           if [ -z "$QUERY" ]; then QUERY="auto"; fi
           
           POST_IDX="$INPUT_POST_INDEX"
-          if [ -z "$POST_IDX" ]; then POST_IDX="random"; fi
+          if [ -z "$POST_IDX" ]; then POST_IDX="sequence"; fi
           
           CMD=(python -u scripts/daily_post.py --require-any-ai --fallback-to-draft-on-all-fail --fallback-on-openai-error --ai-provider-order "openai,anthropic,gemini,deepseek" --query "$QUERY" --post-index "$POST_IDX")
           
@@ -75,10 +75,10 @@ jobs:
         continue-on-error: true
         with:
           token: ${{ secrets.GH_PAT != '' && secrets.GH_PAT || github.token }}
-          commit-message: "chore: gerar rascunho de post diário"
-          title: "Rascunho: Post Diário (Instagram)"
-          body: "Gerado automaticamente pelo workflow diário. Por favor, revise as informações e faça o merge para publicar."
-          branch: "automation/daily-post"
+          commit-message: "chore: gerar rascunho de post semanal"
+          title: "Rascunho: Post Semanal (Instagram)"
+          body: "Gerado automaticamente pelo workflow semanal. Por favor, revise as informações e faça o merge para publicar."
+          branch: "automation/weekly-post"
           labels: automation
           add-paths: |
             content/daily-posts/*.md
